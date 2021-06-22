@@ -71,16 +71,7 @@ def organize_past_data(xlsx_to_organize):
     df.to_csv('cmo_monthly_organized.csv', index=False, header=True)
 
 
-def update(csv_to_update):
-    # csv_to_update : 업데이트할 csv 파일
-
-    # 작업 현황 파악을 위한 출력
-    print('Updating', csv_to_update)
-
-    # 기존의 csv 파일을 데이터프레임으로 불러와 출력
-    df_past = pd.read_csv(csv_to_update)
-    print('Data before update:\n', df_past)
-
+def update():
     # 크롬 창 뜨지 않게 설정 추가
     chrome_options = Options()
     chrome_options.add_argument("--headless")
@@ -127,26 +118,17 @@ def update(csv_to_update):
     # 'month' 값을 datetime.date 값으로 변환
     new_month = datetime.datetime.strptime(new_data[0], '%YM%m').date()
     new_data[0] = new_month
-    new_data.insert(0, len(df_past.index) - 1)
 
-    print('New data : \n', new_data)
+    return(new_data)
 
+    """
     # 새로운 데이터가 기존 데이터 다음 달의 데이터가 아닌 경우, 업데이트 취소
     latest_month = datetime.datetime.strptime(df_past.loc[len(df_past.index) - 1].at['cdate'], '%Y-%m-%d').date()
     if new_month != latest_month + relativedelta(months=1):
         print('Wrong month for new data. Update cancelled.')
         os.remove('CMO-Historical-Data-Monthly.xlsx')
         return
-
-    # df_past 에 새로운 데이터 추가 후 출력
-    df_past.loc[len(df_past)] = new_data
-    print('Data after update:\n', df_past)
-
-    # 새로운 csv 파일에 저장 (파일명 뒤에 업데이트 된 달 추가)
-    df_past.to_csv('cmo_monthly_{}.csv'.format(new_month), index=False, header=True)
-
-    # 작업 현황 파악을 위한 출력
-    print('Update completed.')
+    """
 
     # 다운로드한 xlsx 파일을 지우고 싶을 경우
     os.remove('CMO-Historical-Data-Monthly.xlsx')
@@ -168,6 +150,95 @@ def toMySQL():
     print('{}.csv is added to MySQL'.format(data_name))
 
 
+# update MySQL
+def updateMySQL():
+    table_name = 'SMP.monthly_commodity_eric'
+
+    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
+        ip_address = text_file.readline().strip()
+        id = text_file.readline().strip()
+        pw = text_file.readline().strip()
+
+    # connect to MySQL
+    try:
+        cnx = mysql.connector.connect(user=id, password=pw, host=ip_address, database='SMP')
+    except mysql.connector.Error as error:
+        if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+            print("Something is wrong with your user name or password")
+        elif error.errno == errorcode.ER_BAD_DB_ERROR:
+            print("Database does not exist")
+        else:
+            print(error)
+
+    # get the last row of the table
+    cursor = cnx.cursor()
+    cursor.execute(cursor.execute("SELECT * FROM {} ORDER BY id DESC LIMIT 1".format(table_name)))
+    last_row = cursor.fetchall()
+    last_id = last_row[0][0]
+    print('Last row : ', last_row, '\n')
+
+    # get new data by calling update function
+    new_data = update()
+    print('New data to be added :\n', new_data)
+
+    """
+    # check if the new_data is appropriate
+    if new_data[0] != last_row[0][1] + relativedelta(months=1):
+        print('Update cancelled : Incorrect month for new data')
+
+    else:
+        # insert the new data to the table
+        insert_data = [last_id + 1] + new_data
+        print(insert_data)
+
+        # insert into table
+        try:
+            query_string = 'INSERT INTO {} VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
+            cursor.execute(query_string, insert_data)
+            cnx.commit()
+            print('New data inserted into MySQL table.')
+
+        except mysql.connector.Error as error:
+            print('Failed to insert into MySQL table {}'.format(error))
+    """
+
+    # close MySQL connection if it is connected
+    if cnx.is_connected():
+        cursor.close()
+        cnx.close()
+
+
+# delete rows in MySQL
+def deleteMySQL():
+    table_name = 'SMP.monthly_commodity_eric'
+
+    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
+        ip_address = text_file.readline().strip()
+        id = text_file.readline().strip()
+        pw = text_file.readline().strip()
+
+    # connect to MySQL
+    try:
+        cnx = mysql.connector.connect(user=id, password=pw, host=ip_address, database='SMP')
+    except mysql.connector.Error as error:
+        if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+            print("Something is wrong with your user name or password")
+        elif error.errno == errorcode.ER_BAD_DB_ERROR:
+            print("Database does not exist")
+        else:
+            print(error)
+
+    # get the last row of the table
+    cursor = cnx.cursor()
+    cursor.execute(cursor.execute("DELETE FROM {} WHERE id > 56640".format(table_name)))
+    cnx.commit()
+
+    # close MySQL connection if it is connected
+    if cnx.is_connected():
+        cursor.close()
+        cnx.close()
+
+
 # main function
 def main():
     # 과거 데이터 정리
@@ -176,7 +247,11 @@ def main():
 
     # 데이터 업데이트
     # update('cmo_monthly_organized.csv')
-    toMySQL()
+
+    # MySQL
+    # toMySQL()
+    # updateMySQL()
+    # deleteMySQL()
 
 
 if __name__ == '__main__':

@@ -273,7 +273,7 @@ def update():
 def toMySQL():
     data_name = 'daily_smp_weighted_average'
 
-    with open(r'C:\Users\boojw\OneDrive\Desktop\new_smp\MySQL_info.txt', 'r') as text_file:
+    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
         id = text_file.readline().strip()
         pw = text_file.readline().strip()
@@ -289,7 +289,7 @@ def toMySQL():
 def updateMySQL():
     table_name = 'SMP.daily_smp_weighted_average_eric'
 
-    with open(r'C:\Users\boojw\OneDrive\Desktop\new_smp\MySQL_info.txt', 'r') as text_file:
+    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
         id = text_file.readline().strip()
         pw = text_file.readline().strip()
@@ -344,7 +344,7 @@ def updateMySQL():
 def deleteMySQL():
     table_name = 'SMP.daily_smp_weighted_average_eric'
 
-    with open(r'C:\Users\boojw\OneDrive\Desktop\new_smp\MySQL_info.txt', 'r') as text_file:
+    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
         id = text_file.readline().strip()
         pw = text_file.readline().strip()

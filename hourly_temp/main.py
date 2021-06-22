@@ -351,7 +351,7 @@ def update():
     df_new.insert(0, 'cdate', date_column)
 
     # insert 'id' column
-    df_new.reset_index()
+    df_new.reset_index(drop=True, inplace=True)
 
     return df_new
 
@@ -360,7 +360,7 @@ def update():
 def toMySQL():
     data_name = 'hourly_temp'
 
-    with open(r'C:\Users\boojw\OneDrive\Desktop\new_smp\MySQL_info.txt', 'r') as text_file:
+    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
         id = text_file.readline().strip()
         pw = text_file.readline().strip()
@@ -376,7 +376,7 @@ def toMySQL():
 def updateMySQL():
     table_name = 'SMP.hourly_temp_eric'
 
-    with open(r'C:\Users\boojw\OneDrive\Desktop\new_smp\MySQL_info.txt', 'r') as text_file:
+    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
         id = text_file.readline().strip()
         pw = text_file.readline().strip()
@@ -403,10 +403,9 @@ def updateMySQL():
     new_data = update()
     print('New data to be added :\n', new_data, '\n')
 
-    """
     # check if the new_data is appropriate
     if new_data.iloc[0].at['cdate'] != last_row[0][1] + relativedelta(days=1):
-        print('Incorrect date for new data. Update cancelled.')
+        print('Update cancelled : Incorrect date for new data')
 
     else:
         # insert the new data to the table by taking each row
@@ -417,14 +416,13 @@ def updateMySQL():
 
             # insert into table
             try:
-                query_string = 'INSERT INTO {} VALUES (%s, %s, %s, %s, %s);'.format(table_name)
+                query_string = 'INSERT INTO {} VALUES (%s, %s, %s, %s, %s, %s);'.format(table_name)
                 cursor.execute(query_string, insert_data)
                 cnx.commit()
                 print('New data inserted into MySQL table.')
 
             except mysql.connector.Error as error:
                 print('Failed to insert into MySQL table {}'.format(error))
-    """
 
     # close MySQL connection if it is connected
     if cnx.is_connected():
@@ -436,7 +434,7 @@ def updateMySQL():
 def deleteMySQL():
     table_name = 'SMP.hourly_temp_eric'
 
-    with open(r'C:\Users\boojw\OneDrive\Desktop\new_smp\MySQL_info.txt', 'r') as text_file:
+    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
         id = text_file.readline().strip()
         pw = text_file.readline().strip()
@@ -454,7 +452,7 @@ def deleteMySQL():
 
     # get the last row of the table
     cursor = cnx.cursor()
-    cursor.execute(cursor.execute("DELETE FROM {} WHERE id > 56640".format(table_name)))
+    cursor.execute(cursor.execute("DELETE FROM {} WHERE id > 955944".format(table_name)))
     cnx.commit()
 
     # close MySQL connection if it is connected
@@ -473,7 +471,7 @@ def main():
 
     # MySQL
     # toMySQL()
-    updateMySQL()
+    # updateMySQL()
     # deleteMySQL()
 
 

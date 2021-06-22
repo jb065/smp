@@ -82,9 +82,6 @@ def get_ultra():
     df_ultra = df_ultra.set_index(['base_date', 'base_time', 'target_date', 'target_time'])
     df_ultra = df_ultra.sort_index(axis=0)
     df_ultra.reset_index(level=['base_date', 'base_time', 'target_date', 'target_time'], inplace=True)
-    # index column 이름 'id' 로 설정
-    df_ultra.index = np.arange(1, len(df_ultra) + 1)
-    df_ultra.index.name = 'id'
 
     # 'base_date' and 'target_date' columns get converted to pandas._libs.tslibs.timestamps.Timestamp type
     # convert them back to datetime.date type
@@ -170,9 +167,6 @@ def get_village():
     df_village = df_village.set_index(['base_date', 'base_time', 'target_date', 'target_time'])
     df_village = df_village.sort_index(axis=0)
     df_village.reset_index(level=['base_date', 'base_time', 'target_date', 'target_time'], inplace=True)
-    # index column 이름 'id' 로 설정
-    df_village.index = np.arange(1, len(df_village) + 1)
-    df_village.index.name = 'id'
 
     # 'base_date' and 'target_date' columns get converted to pandas._libs.tslibs.timestamps.Timestamp type
     # convert them back to datetime.date type
@@ -267,9 +261,6 @@ def get_mid():
     df_mid = df_mid.set_index(['base_date', 'base_time', 'target_date'])
     df_mid = df_mid.sort_index(axis=0)
     df_mid.reset_index(level=['base_date', 'base_time', 'target_date'], inplace=True)
-    # index column 이름 'id' 로 설정
-    df_mid.index = np.arange(1, len(df_mid) + 1)
-    df_mid.index.name = 'id'
 
     # 'base_date' and 'target_date' columns get converted to pandas._libs.tslibs.timestamps.Timestamp type
     # convert them back to datetime.date type
@@ -282,13 +273,42 @@ def get_mid():
     return df_mid
 
 
+# csv file to MySQL
+def toMySQL():
+    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
+        ip_address = text_file.readline().strip()
+        id = text_file.readline().strip()
+        pw = text_file.readline().strip()
+
+    data_name = 'forecast_ultra'
+    csv_data = pd.read_csv('{}.csv'.format(data_name))
+    engine = create_engine('mysql+mysqldb://{}:{}@{}:3306/SMP'.format(id, pw, ip_address), echo=False)
+    csv_data.to_sql(name='{}_eric'.format(data_name), con=engine, if_exists='replace', index=False)
+    print('{}.csv is added to MySQL'.format(data_name))
+
+    data_name = 'forecast_village'
+    csv_data = pd.read_csv('{}.csv'.format(data_name))
+    csv_data.to_sql(name='{}_eric'.format(data_name), con=engine, if_exists='replace', index=False)
+    print('{}.csv is added to MySQL'.format(data_name))
+
+    data_name = 'forecast_mid'
+    csv_data = pd.read_csv('{}.csv'.format(data_name))
+    csv_data.to_sql(name='{}_eric'.format(data_name), con=engine, if_exists='replace', index=False)
+    print('{}.csv is added to MySQL'.format(data_name))
+
+
 # update MySQL_ultra
 def update_MySQL_ultra():
     table_name = 'SMP.forecast_ultra_eric'
 
+    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
+        ip_address = text_file.readline().strip()
+        id = text_file.readline().strip()
+        pw = text_file.readline().strip()
+
     # connect to MySQL
     try:
-        cnx = mysql.connector.connect(user='eric', password='rndenerdot21!', host='52.78.39.99', database='SMP')
+        cnx = mysql.connector.connect(user=id, password=pw, host=ip_address, database='SMP')
     except mysql.connector.Error as error:
         if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
             print("Something is wrong with your user name or password")
@@ -311,7 +331,7 @@ def update_MySQL_ultra():
         # insert into table
         try:
             query_string = 'INSERT INTO {} VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
-            cursor.execute(query_string, [index] + row.values.tolist())
+            cursor.execute(query_string, [index + 1] + row.values.tolist())
 
             # commit : make changes persistent to the database
             cnx.commit()
@@ -331,9 +351,14 @@ def update_MySQL_ultra():
 def update_MySQL_village():
     table_name = 'SMP.forecast_village_eric'
 
+    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
+        ip_address = text_file.readline().strip()
+        id = text_file.readline().strip()
+        pw = text_file.readline().strip()
+
     # connect to MySQL
     try:
-        cnx = mysql.connector.connect(user='eric', password='rndenerdot21!', host='52.78.39.99', database='SMP')
+        cnx = mysql.connector.connect(user=id, password=pw, host=ip_address, database='SMP')
     except mysql.connector.Error as error:
         if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
             print("Something is wrong with your user name or password")
@@ -356,7 +381,7 @@ def update_MySQL_village():
         # insert into table
         try:
             query_string = 'INSERT INTO {} VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
-            cursor.execute(query_string, [index] + row.values.tolist())
+            cursor.execute(query_string, [index + 1] + row.values.tolist())
 
             # commit : make changes persistent to the database
             cnx.commit()
@@ -376,9 +401,14 @@ def update_MySQL_village():
 def update_MySQL_mid():
     table_name = 'SMP.forecast_mid_eric'
 
+    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
+        ip_address = text_file.readline().strip()
+        id = text_file.readline().strip()
+        pw = text_file.readline().strip()
+
     # connect to MySQL
     try:
-        cnx = mysql.connector.connect(user='eric', password='rndenerdot21!', host='52.78.39.99', database='SMP')
+        cnx = mysql.connector.connect(user=id, password=pw, host=ip_address, database='SMP')
     except mysql.connector.Error as error:
         if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
             print("Something is wrong with your user name or password")
@@ -401,7 +431,7 @@ def update_MySQL_mid():
         # insert into table
         try:
             query_string = 'INSERT INTO {} VALUES (%s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
-            cursor.execute(query_string, [index] + row.values.tolist())
+            cursor.execute(query_string, [index + 1] + row.values.tolist())
 
             # commit : make changes persistent to the database
             cnx.commit()
@@ -417,39 +447,14 @@ def update_MySQL_mid():
         cnx.close()
 
 
-# csv file to MySQL
-def toMySQL():
-    with open(r'C:\Users\boojw\OneDrive\Desktop\new_smp\MySQL_info.txt', 'r') as text_file:
-        ip_address = text_file.readline().strip()
-        id = text_file.readline().strip()
-        pw = text_file.readline().strip()
-
-    data_name = 'forecast_ultra'
-    csv_data = pd.read_csv('{}.csv'.format(data_name))
-    engine = create_engine('mysql+mysqldb://{}:{}@{}:3306/SMP'.format(id, pw, ip_address), echo=False)
-    csv_data.to_sql(name='{}_eric'.format(data_name), con=engine, if_exists='replace', index=False)
-    print('{}.csv is added to MySQL'.format(data_name))
-
-    data_name = 'forecast_village'
-    csv_data = pd.read_csv('{}.csv'.format(data_name))
-    engine = create_engine('mysql+mysqldb://{}:{}@{}:3306/SMP'.format(id, pw, ip_address), echo=False)
-    csv_data.to_sql(name='{}_eric'.format(data_name), con=engine, if_exists='replace', index=False)
-    print('{}.csv is added to MySQL'.format(data_name))
-
-    data_name = 'forecast_mid'
-    csv_data = pd.read_csv('{}.csv'.format(data_name))
-    engine = create_engine('mysql+mysqldb://{}:{}@{}:3306/SMP'.format(id, pw, ip_address), echo=False)
-    csv_data.to_sql(name='{}_eric'.format(data_name), con=engine, if_exists='replace', index=False)
-    print('{}.csv is added to MySQL'.format(data_name))
-
-
 # main function
 def main():
     # MySQL
+    # toMySQL()
     # update_MySQL_ultra()
     # update_MySQL_village()
     # update_MySQL_mid()
-    toMySQL()
+    # deleteMySQL()
 
 
 if __name__ == '__main__':
