@@ -12,6 +12,7 @@ from dateutil.relativedelta import relativedelta
 import mysql.connector
 from mysql.connector import errorcode
 from sqlalchemy import create_engine
+import sys
 
 
 def organize_past_data(xlsx_to_organize):
@@ -35,8 +36,9 @@ def organize_past_data(xlsx_to_organize):
 
     # index 재설정
     df = df.reset_index(drop=True)
-    # column 이름 소문자로 통일
+    # column 이름 설정 (소문자로 통일, inatgas 이름 변경)
     df.columns = [x.lower() for x in df.columns]
+    df = df.rename(columns={'inatgas': 'ngas_index'})
 
     # 2015년 이전의 데이터 삭제
     month_column = df['cdate'].tolist()
@@ -58,17 +60,18 @@ def organize_past_data(xlsx_to_organize):
     # 'cdate' column 에 새로운 리스트 기입
     df['cdate'] = new_month_column
 
+    # delete 'unit' row
+    df = df.drop(0, axis=0)
+
     # id column 설정 (index 를 리스트로 가져와 첫 element 를 'unit' 으로 설정)
     df = df.reset_index(drop=True)
     df.index = np.arange(1, len(df) + 1)
     id_column = df.index.tolist()
-    id_column.insert(0, 'unit')
-    id_column.pop()
     df.insert(0, 'id', id_column)
 
     # 완성된 데이터프레임 출력 후 csv 파일에 저장
     print(df)
-    df.to_csv('cmo_monthly_organized.csv', index=False, header=True)
+    df.to_csv('monthly_commodity.csv', index=False, header=True)
 
 
 def update():
@@ -138,21 +141,21 @@ def update():
 def toMySQL():
     data_name = 'monthly_commodity'
 
-    with open(r'C:\Users\boojw\OneDrive\Desktop\new_smp\MySQL_info.txt', 'r') as text_file:
+    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
         id = text_file.readline().strip()
         pw = text_file.readline().strip()
 
     csv_data = pd.read_csv('{}.csv'.format(data_name))
     engine = create_engine('mysql+mysqldb://{}:{}@{}:3306/SMP'.format(id, pw, ip_address), echo=False)
-    csv_data.to_sql(name='{}_eric'.format(data_name), con=engine, if_exists='replace', index=False)
+    csv_data.to_sql(name='eric_{}'.format(data_name), con=engine, if_exists='replace', index=False)
 
     print('{}.csv is added to MySQL'.format(data_name))
 
 
 # update MySQL
 def updateMySQL():
-    table_name = 'SMP.monthly_commodity_eric'
+    table_name = 'SMP.eric_monthly_commodity'
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
@@ -170,47 +173,52 @@ def updateMySQL():
         else:
             print(error)
 
-    # get the last row of the table
-    cursor = cnx.cursor()
-    cursor.execute(cursor.execute("SELECT * FROM {} ORDER BY id DESC LIMIT 1".format(table_name)))
-    last_row = cursor.fetchall()
-    last_id = last_row[0][0]
-    print('Last row : ', last_row, '\n')
+    # update MySQL data
+    try:
+        # get the last row of the table
+        cursor = cnx.cursor()
+        cursor.execute(cursor.execute("SELECT * FROM {} ORDER BY id DESC LIMIT 1".format(table_name)))
+        last_row = cursor.fetchall()
+        last_id = last_row[0][0]
+        print('Last row : ', last_row, '\n')
 
-    # get new data by calling update function
-    new_data = update()
-    print('New data to be added :\n', new_data)
+        # get new data by calling update function
+        new_data = update()
+        print('New data to be added :\n', new_data)
 
-    """
-    # check if the new_data is appropriate
-    if new_data[0] != last_row[0][1] + relativedelta(months=1):
-        print('Update cancelled : Incorrect month for new data')
-
-    else:
-        # insert the new data to the table
-        insert_data = [last_id + 1] + new_data
-        print(insert_data)
-
-        # insert into table
-        try:
+        """
+        # check if the new_data is appropriate
+        if new_data[0] != last_row[0][1] + relativedelta(months=1):
+            print('Update cancelled : Incorrect month for new data')
+    
+        else:
+            # insert the new data to the table
+            insert_data = [last_id + 1] + new_data
+            print(insert_data)
+    
+            # insert into table
             query_string = 'INSERT INTO {} VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
             cursor.execute(query_string, insert_data)
             cnx.commit()
             print('New data inserted into MySQL table.')
+        """
 
-        except mysql.connector.Error as error:
-            print('Failed to insert into MySQL table {}'.format(error))
-    """
+    except mysql.connector.Error as error:
+        print('Failed to insert into MySQL table. {}\n'.format(error))
 
-    # close MySQL connection if it is connected
-    if cnx.is_connected():
-        cursor.close()
-        cnx.close()
+    except:
+        print("Unexpected error:", sys.exc_info()[0], '\n')
+
+    finally:
+        if cnx.is_connected():
+            cursor.close()
+            cnx.close()
+            print('MySQL connection is closed\n')
 
 
 # delete rows in MySQL
 def deleteMySQL():
-    table_name = 'SMP.monthly_commodity_eric'
+    table_name = 'SMP.eric_monthly_commodity'
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
@@ -220,6 +228,12 @@ def deleteMySQL():
     # connect to MySQL
     try:
         cnx = mysql.connector.connect(user=id, password=pw, host=ip_address, database='SMP')
+
+        # delete the target
+        cursor = cnx.cursor()
+        cursor.execute(cursor.execute("DELETE FROM {} WHERE id = 78".format(table_name)))
+        cnx.commit()
+
     except mysql.connector.Error as error:
         if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
             print("Something is wrong with your user name or password")
@@ -228,15 +242,14 @@ def deleteMySQL():
         else:
             print(error)
 
-    # get the last row of the table
-    cursor = cnx.cursor()
-    cursor.execute(cursor.execute("DELETE FROM {} WHERE id > 56640".format(table_name)))
-    cnx.commit()
+    except:
+        print("Unexpected error:", sys.exc_info()[0], '\n')
 
-    # close MySQL connection if it is connected
-    if cnx.is_connected():
-        cursor.close()
-        cnx.close()
+    finally:
+        if cnx.is_connected():
+            cursor.close()
+            cnx.close()
+            print('MySQL connection is closed\n')
 
 
 # main function
@@ -249,7 +262,7 @@ def main():
     # update('cmo_monthly_organized.csv')
 
     # MySQL
-    # toMySQL()
+    toMySQL()
     # updateMySQL()
     # deleteMySQL()
 

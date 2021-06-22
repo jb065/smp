@@ -10,6 +10,7 @@ from dateutil.relativedelta import relativedelta
 import mysql.connector
 from mysql.connector import errorcode
 from sqlalchemy import create_engine
+import sys
 
 
 # 과거 데이터 종합 (사이트에서 받은 파일 그대로 사용)
@@ -204,14 +205,14 @@ def toMySQL():
 
     csv_data = pd.read_csv('{}.csv'.format(data_name))
     engine = create_engine('mysql+mysqldb://{}:{}@{}:3306/SMP'.format(id, pw, ip_address), echo=False)
-    csv_data.to_sql(name='{}_eric'.format(data_name), con=engine, if_exists='replace', index=False)
+    csv_data.to_sql(name='eric_{}'.format(data_name), con=engine, if_exists='replace', index=False)
 
     print('{}.csv is added to MySQL'.format(data_name))
 
 
 # update MySQL
 def updateMySQL():
-    table_name = 'SMP.hourly_powersupply_eric'
+    table_name = 'SMP.eric_hourly_powersupply'
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
@@ -229,50 +230,55 @@ def updateMySQL():
         else:
             print(error)
 
-    # get the last row of the table
-    cursor = cnx.cursor()
-    cursor.execute(cursor.execute("SELECT * FROM {} ORDER BY id DESC LIMIT 1".format(table_name)))
-    last_row = cursor.fetchall()
-    last_id = last_row[0][0]
+    # update MySQL data
+    try:
+        # get the last row of the table
+        cursor = cnx.cursor()
+        cursor.execute(cursor.execute("SELECT * FROM {} ORDER BY id DESC LIMIT 1".format(table_name)))
+        last_row = cursor.fetchall()
+        last_id = last_row[0][0]
 
-    print('Last row : ', last_row, '\n')
+        print('Last row : ', last_row, '\n')
 
-    # get new data by calling update function
-    new_data = update()
-    print('New data to be added :\n', new_data, '\n')
+        # get new data by calling update function
+        new_data = update()
+        print('New data to be added :\n', new_data, '\n')
 
-    # check if the new_data is appropriate
-    latest_time = datetime.datetime.combine(last_row[0][1], (datetime.datetime.min + last_row[0][2]).time())
-    new_time = datetime.datetime.combine(new_data[0], new_data[1])
+        # check if the new_data is appropriate
+        latest_time = datetime.datetime.combine(last_row[0][1], (datetime.datetime.min + last_row[0][2]).time())
+        new_time = datetime.datetime.combine(new_data[0], new_data[1])
 
-    if new_time != latest_time + relativedelta(hours=1):
-        print('Update cancelled : Incorrect date for new data')
-    elif new_time.minute != 0:
-        print('Update cancelled : Update should occur at every hour')
-    else:
-        # insert the new data to the table
-        insert_data = [last_id + 1] + new_data
-        print(insert_data)
+        if new_time != latest_time + relativedelta(hours=1):
+            print('Update cancelled : Incorrect date for new data')
+        elif new_time.minute != 0:
+            print('Update cancelled : Update should occur at every hour')
+        else:
+            # insert the new data to the table
+            insert_data = [last_id + 1] + new_data
+            print(insert_data)
 
-        # insert into table
-        try:
+            # insert into table
             query_string = 'INSERT INTO {} VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
             cursor.execute(query_string, insert_data)
             cnx.commit()
             print('New data inserted into MySQL table.')
 
-        except mysql.connector.Error as error:
-            print('Failed to insert into MySQL table {}'.format(error))
+    except mysql.connector.Error as error:
+        print('Failed to insert into MySQL table {}\n'.format(error))
 
-    # close MySQL connection if it is connected
-    if cnx.is_connected():
-        cursor.close()
-        cnx.close()
+    except:
+        print("Unexpected error:", sys.exc_info()[0], '\n')
+
+    finally:
+        if cnx.is_connected():
+            cursor.close()
+            cnx.close()
+            print('MySQL connection is closed\n')
 
 
 # delete rows in MySQL
 def deleteMySQL():
-    table_name = 'SMP.hourly_powersupply_eric'
+    table_name = 'SMP.eric_hourly_powersupply'
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
@@ -282,6 +288,12 @@ def deleteMySQL():
     # connect to MySQL
     try:
         cnx = mysql.connector.connect(user=id, password=pw, host=ip_address, database='SMP')
+
+        # delete the target
+        cursor = cnx.cursor()
+        cursor.execute(cursor.execute("DELETE FROM {} WHERE id = 56559".format(table_name)))
+        cnx.commit()
+
     except mysql.connector.Error as error:
         if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
             print("Something is wrong with your user name or password")
@@ -290,15 +302,14 @@ def deleteMySQL():
         else:
             print(error)
 
-    # get the last row of the table
-    cursor = cnx.cursor()
-    cursor.execute(cursor.execute("DELETE FROM {} WHERE id = 56559".format(table_name)))
-    cnx.commit()
+    except:
+        print("Unexpected error:", sys.exc_info()[0], '\n')
 
-    # close MySQL connection if it is connected
-    if cnx.is_connected():
-        cursor.close()
-        cnx.close()
+    finally:
+        if cnx.is_connected():
+            cursor.close()
+            cnx.close()
+            print('MySQL connection is closed\n')
 
 
 # main function
