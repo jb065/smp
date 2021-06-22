@@ -328,8 +328,9 @@ def update_MySQL_ultra():
         # insert each row of df_ultra to MySQL
         for index, row in df_ultra.iterrows():
             # insert into table
-            query_string = 'INSERT INTO {} VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
-            cursor.execute(query_string, [index + 1] + row.values.tolist())
+            query_string = 'INSERT INTO {} (base_date, base_time, target_date, target_time, city, city_x, city_y, ' \
+                           'forecast_temp) VALUES (%s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
+            cursor.execute(query_string, row.values.tolist())
 
             # commit : make changes persistent to the database
             cnx.commit()
@@ -340,7 +341,7 @@ def update_MySQL_ultra():
         print('Failed to insert into MySQL table. {}\n'.format(error))
 
     except:
-        print("Unexpected error:", sys.exc_info()[0], '\n')
+        print("Unexpected error:", sys.exc_info(), '\n')
 
     finally:
         if cnx.is_connected():
@@ -379,8 +380,9 @@ def update_MySQL_village():
         # insert each row of df_ultra to MySQL
         for index, row in df_village.iterrows():
             # insert into table
-            query_string = 'INSERT INTO {} VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
-            cursor.execute(query_string, [index + 1] + row.values.tolist())
+            query_string = 'INSERT INTO {} (base_date, base_time, target_date, target_time, city, city_x, city_y, ' \
+                           'forecast_temp) VALUES (%s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
+            cursor.execute(query_string, row.values.tolist())
 
             # commit : make changes persistent to the database
             cnx.commit()
@@ -391,7 +393,7 @@ def update_MySQL_village():
         print('Failed to insert into MySQL table. {}\n'.format(error))
 
     except:
-        print("Unexpected error:", sys.exc_info()[0], '\n')
+        print("Unexpected error:", sys.exc_info(), '\n')
 
     finally:
         if cnx.is_connected():
@@ -430,8 +432,9 @@ def update_MySQL_mid():
         # insert each row of df_ultra to MySQL
         for index, row in df_mid.iterrows():
             # insert into table
-            query_string = 'INSERT INTO {} VALUES (%s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
-            cursor.execute(query_string, [index + 1] + row.values.tolist())
+            query_string = 'INSERT INTO {} (base_date, base_time, target_date, city, city_code, temp_min, temp_max) ' \
+                           'VALUES (%s, %s, %s, %s, %s, %s, %s);'.format(table_name)
+            cursor.execute(query_string, row.values.tolist())
 
             # commit : make changes persistent to the database
             cnx.commit()
@@ -442,7 +445,7 @@ def update_MySQL_mid():
         print('Failed to insert into MySQL table. {}\n'.format(error))
 
     except:
-        print("Unexpected error:", sys.exc_info()[0], '\n')
+        print("Unexpected error:", sys.exc_info(), '\n')
 
     finally:
         if cnx.is_connected():
@@ -468,6 +471,7 @@ def deleteMySQL():
         cursor = cnx.cursor()
         cursor.execute(cursor.execute("DELETE FROM {}".format(table_name)))
         cnx.commit()
+        print('Deletion completed.')
 
     except mysql.connector.Error as error:
         if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
@@ -478,7 +482,7 @@ def deleteMySQL():
             print(error)
 
     except:
-        print("Unexpected error:", sys.exc_info()[0], '\n')
+        print("Unexpected error:", sys.exc_info(), '\n')
 
     finally:
         if cnx.is_connected():
@@ -584,7 +588,7 @@ def main():
     # toMySQL()
     # update_MySQL_ultra()
     # update_MySQL_village()
-    update_MySQL_mid()
+    # update_MySQL_mid()
     # deleteMySQL()
 
     # TEST

@@ -312,7 +312,6 @@ def updateMySQL():
         cursor = cnx.cursor()
         cursor.execute(cursor.execute("SELECT * FROM {} ORDER BY id DESC LIMIT 1".format(table_name)))
         last_row = cursor.fetchall()
-        last_id = last_row[0][0]
         print('Last row : ', last_row, '\n')
 
         # get new data by calling update function
@@ -321,15 +320,12 @@ def updateMySQL():
 
         # check if the new_data is appropriate
         if new_data[0] != last_row[0][1] + relativedelta(days=1):
-            print('Incorrect date for new data. Update cancelled.')
+            print('Update cancelled : Incorrect date for new data')
 
         else:
             # insert into table
-            insert_data = [last_id + 1] + new_data
-            print(insert_data)
-
-            query_string = 'INSERT INTO {} VALUES (%s, %s, %s, %s);'.format(table_name)
-            cursor.execute(query_string, insert_data)
+            query_string = 'INSERT INTO {} (cdate, land_wa, jeju_wa) VALUES (%s, %s, %s);'.format(table_name)
+            cursor.execute(query_string, new_data)
             cnx.commit()
             print('New data inserted into MySQL table.')
 
@@ -363,6 +359,7 @@ def deleteMySQL():
         cursor = cnx.cursor()
         cursor.execute("DELETE FROM {} WHERE id = 2362 ".format(table_name))
         cnx.commit()
+        print('Deletion completed.')
 
     except mysql.connector.Error as error:
         if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
@@ -373,7 +370,7 @@ def deleteMySQL():
             print(error)
 
     except:
-        print("Unexpected error:", sys.exc_info()[0], '\n')
+        print("Unexpected error:", sys.exc_info(), '\n')
 
     finally:
         if cnx.is_connected():

@@ -179,35 +179,30 @@ def updateMySQL():
         cursor = cnx.cursor()
         cursor.execute(cursor.execute("SELECT * FROM {} ORDER BY id DESC LIMIT 1".format(table_name)))
         last_row = cursor.fetchall()
-        last_id = last_row[0][0]
         print('Last row : ', last_row, '\n')
 
         # get new data by calling update function
         new_data = update()
         print('New data to be added :\n', new_data)
 
-        """
         # check if the new_data is appropriate
         if new_data[0] != last_row[0][1] + relativedelta(months=1):
             print('Update cancelled : Incorrect month for new data')
     
         else:
-            # insert the new data to the table
-            insert_data = [last_id + 1] + new_data
-            print(insert_data)
-    
             # insert into table
-            query_string = 'INSERT INTO {} VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
-            cursor.execute(query_string, insert_data)
+            query_string = 'INSERT INTO {} (cdate, coal_aus, coal_safrica, crude_petro, crude_brent, crude_dubai, ' \
+                           'crude_wti, ngas_index, ngas_eur, ngas_us, ngas_jp) ' \
+                           'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
+            cursor.execute(query_string, new_data)
             cnx.commit()
             print('New data inserted into MySQL table.')
-        """
 
     except mysql.connector.Error as error:
         print('Failed to insert into MySQL table. {}\n'.format(error))
 
     except:
-        print("Unexpected error:", sys.exc_info()[0], '\n')
+        print("Unexpected error:", sys.exc_info(), '\n')
 
     finally:
         if cnx.is_connected():
@@ -233,6 +228,7 @@ def deleteMySQL():
         cursor = cnx.cursor()
         cursor.execute(cursor.execute("DELETE FROM {} WHERE id = 78".format(table_name)))
         cnx.commit()
+        print('Deletion completed.')
 
     except mysql.connector.Error as error:
         if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
@@ -243,7 +239,7 @@ def deleteMySQL():
             print(error)
 
     except:
-        print("Unexpected error:", sys.exc_info()[0], '\n')
+        print("Unexpected error:", sys.exc_info(), '\n')
 
     finally:
         if cnx.is_connected():
@@ -262,7 +258,7 @@ def main():
     # update('cmo_monthly_organized.csv')
 
     # MySQL
-    toMySQL()
+    # toMySQL()
     # updateMySQL()
     # deleteMySQL()
 

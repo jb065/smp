@@ -226,7 +226,6 @@ def updateMySQL():
         cursor = cnx.cursor()
         cursor.execute("SELECT * FROM {} ORDER BY id DESC LIMIT 1".format(table_name))
         last_row = cursor.fetchall()
-        last_id = last_row[0][0]
         print('Last row : ', last_row, '\n')
 
         # get new data by calling update function
@@ -240,13 +239,10 @@ def updateMySQL():
         else:
             # insert the new data to the table by taking each row
             for index, row in new_data.iterrows():
-                # convert each row of the new dataframe into a list
-                insert_data = [last_id + 1 + index] + row.values.tolist()
-                print(insert_data)
-
                 # insert into table
-                query_string = 'INSERT INTO {} VALUES (%s, %s, %s, %s, %s);'.format(table_name)
-                cursor.execute(query_string, insert_data)
+                query_string = 'INSERT INTO {} (cdate, ctime, land_smp, jeju_smp) ' \
+                               'VALUES (%s, %s, %s, %s);'.format(table_name)
+                cursor.execute(query_string, row.values.tolist())
                 cnx.commit()
                 print('New data inserted into MySQL table.')
 
@@ -254,7 +250,7 @@ def updateMySQL():
         print('Failed to insert into MySQL table. {}\n'.format(error))
 
     except:
-        print("Unexpected error:", sys.exc_info()[0], '\n')
+        print("Unexpected error:", sys.exc_info(), '\n')
 
     finally:
         if cnx.is_connected():
@@ -280,6 +276,7 @@ def deleteMySQL():
         cursor = cnx.cursor()
         cursor.execute(cursor.execute("DELETE FROM {} WHERE id > 56640".format(table_name)))
         cnx.commit()
+        print('Deletion completed.')
 
     except mysql.connector.Error as error:
         if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
@@ -290,7 +287,7 @@ def deleteMySQL():
             print(error)
 
     except:
-        print("Unexpected error:", sys.exc_info()[0], '\n')
+        print("Unexpected error:", sys.exc_info(), '\n')
 
     finally:
         if cnx.is_connected():
@@ -315,7 +312,7 @@ def main():
 
     # MySQL
     # toMySQL()
-    updateMySQL()
+    # updateMySQL()
     # deleteMySQL()
 
 
