@@ -399,11 +399,11 @@ def updateMySQL():
     last_id = last_row[0][0]
     print('Last row : ', last_row, '\n')
 
-    """
     # get new data by calling update function
     new_data = update()
-    print('New data to be added :\n', new_data)
+    print('New data to be added :\n', new_data, '\n')
 
+    """
     # check if the new_data is appropriate
     if new_data.iloc[0].at['cdate'] != last_row[0][1] + relativedelta(days=1):
         print('Incorrect date for new data. Update cancelled.')
