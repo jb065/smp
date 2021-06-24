@@ -168,23 +168,7 @@ def update():
     response = requests.get(url + queryParams)
     tree = ET.ElementTree(ET.fromstring(response.text))
 
-    """
-    # 새로운 데이터의 시간값이 맞는지 확인
-    get_time = datetime.datetime.strptime(tree.find('.//baseDatetime').text, '%Y%m%d%H%M%S')
-    compare_date = datetime.datetime.strptime(df_result.loc[len(df_result) - 1].at['cdate'], '%Y-%m-%d').date()
-    compare_time = datetime.datetime.strptime(df_result.loc[len(df_result) - 1].at['ctime'], '%H:%M:%S').time()
-    to_compare = datetime.datetime.combine(compare_date, compare_time)
-    # 기존 데이터 다음 시간대가 아닌 경우, 업데이트 취소
-    # if get_time != to_compare + relativedelta(hours=1):
-    #     print('Update cancelled : Not correct time for new data')
-    #     return
-    # 정각이 아닐 경우, 업데이트 취소
-    # elif get_time.minute != 0:
-    #     print('Update cancelled : Update should occur at every hour')
-    #     return
-    """
-
-    # 새로운 데이터의 시간값이 맞는 경우, 데이터 정상 수집
+    # collect new data and save it as a list
     get_time = datetime.datetime.strptime(tree.find('.//baseDatetime').text, '%Y%m%d%H%M%S')
     new_data = [get_time.date(), get_time.time(), float(tree.find('.//suppAbility').text),
                 float(tree.find('.//currPwrTot').text), float(tree.find('.//forecastLoad').text),
@@ -232,33 +216,32 @@ def updateMySQL():
 
     # update MySQL data
     try:
-        # get the last row of the table
+        # get new data
         cursor = cnx.cursor()
-        cursor.execute(cursor.execute("SELECT * FROM {} ORDER BY id DESC LIMIT 1".format(table_name)))
-        last_row = cursor.fetchall()
-
-        print('Last row : ', last_row, '\n')
-
-        # get new data by calling update function
         new_data = update()
-        print('New data to be added :\n', new_data, '\n')
+        print('New data to be added :', new_data, '\n')
 
-        # check if the new_data is appropriate
-        latest_time = datetime.datetime.combine(last_row[0][1], (datetime.datetime.min + last_row[0][2]).time())
-        new_time = datetime.datetime.combine(new_data[0], new_data[1])
+        # if the time of the data is not o'clock, cancel the update
+        if new_data[1].minute != 0:
+            print('Update cancelled : Update should occur at every hour\n')
 
-        if new_time != latest_time + relativedelta(hours=1):
-            print('Update cancelled : Incorrect date for new data')
-        elif new_time.minute != 0:
-            print('Update cancelled : Update should occur at every hour')
         else:
-            # insert into table
-            query_string = 'INSERT INTO {} (cdate, ctime, supply_capacity, demand, peak_demand, reserve, ' \
-                           'reserve_margin, operational_reserve, operational_reserve_ratio) VALUES ' \
-                           '(%s, %s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
-            cursor.execute(query_string, new_data)
-            cnx.commit()
-            print('New data inserted into MySQL table.')
+            # check if new_data already exists in MySQL data table
+            query_string = "SELECT count(*) FROM {} where cdate=%s and ctime=%s;".format(table_name)
+            cursor.execute(query_string, new_data[:2])
+            result = cursor.fetchone()
+
+            # if there is no existing data in the table, insert the new_data to the table
+            if result[0] == 0:
+                query_string = 'INSERT INTO {} (cdate, ctime, supply_capacity, demand, peak_demand, reserve, ' \
+                               'reserve_margin, operational_reserve, operational_reserve_ratio) VALUES ' \
+                               '(%s, %s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
+                cursor.execute(query_string, new_data)
+                cnx.commit()
+                print('New data inserted into MySQL table.\n')
+
+            else:
+                print('Update cancelled : Data already exist in the table\n')
 
     except mysql.connector.Error as error:
         print('Failed to insert into MySQL table {}\n'.format(error))
@@ -288,9 +271,9 @@ def deleteMySQL():
 
         # delete the target
         cursor = cnx.cursor()
-        cursor.execute(cursor.execute("DELETE FROM {} WHERE id = 56559".format(table_name)))
+        cursor.execute(cursor.execute("DELETE FROM {} WHERE id = 56560".format(table_name)))
         cnx.commit()
-        print('Deletion completed.')
+        print('Deletion completed.\n')
 
     except mysql.connector.Error as error:
         if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
@@ -322,7 +305,9 @@ def main():
     # MySQL
     # toMySQL()
     # updateMySQL()
-    deleteMySQL()
+    # deleteMySQL()
+
+
 
 
 if __name__ == '__main__':

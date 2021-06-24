@@ -224,7 +224,7 @@ def update():
     # CSS_SELECTOR 중에 해당값이 있을 때 까지 최대 3초 대기
     try:
         element_present = EC.presence_of_element_located((By.CSS_SELECTOR, '#rMateH5__Content404 > span:nth-child(55)'))
-        WebDriverWait(driver, 3).until(element_present)
+        WebDriverWait(driver, 5).until(element_present)
 
     except TimeoutException:
         print('Loading took too much time. Update cancelled.')
@@ -233,8 +233,10 @@ def update():
 
     soup = BeautifulSoup(driver.page_source, 'html.parser')
 
-    # 새로운 날짜의 데이터를 저장할 리스트
-    new_data = []  # [cdate, land_wa, jeju_wa]
+    # 새로운 날짜의 데이터를 저장할 리스트 [cdate, land_wa, jeju_wa]
+    new_data = []
+    # list of weighted average values [land_wa, jeju_wa]
+    value_list = []
 
     # 'date' 값 추가
     target = soup.select_one('#grid1 > div > div > div.rMateH5__DataGridBaseContentHolder > span:nth-child(8)')
@@ -242,7 +244,7 @@ def update():
 
     # 육지 가중평균값 추가
     target = soup.select_one('#rMateH5__Content404 > span:nth-child(55)')
-    new_data.append(target.text)
+    value_list.append(target.text)
 
     # 제주 smp 조회
     driver.find_element_by_css_selector('#selKind2').click()
@@ -251,7 +253,7 @@ def update():
     # 제주 smp 가 조회될 때 까지 최대 3초 대기
     try:
         element_present = EC.presence_of_element_located((By.CSS_SELECTOR, '#rMateH5__Content1208 > span:nth-child(55)'))
-        WebDriverWait(driver, 3).until(element_present)
+        WebDriverWait(driver, 5).until(element_present)
 
     except TimeoutException:
         print('Loading took too much time')
@@ -261,10 +263,13 @@ def update():
     # 제주 가중평균값 추가
     soup = BeautifulSoup(driver.page_source, 'html.parser')
     target = soup.select_one('#rMateH5__Content1208 > span:nth-child(55)')
-    new_data.append(target.text)
+    value_list.append(target.text)
 
     # 크롬 드라이버 종료
     driver.close()
+
+    # convert weighted average values to float and add them to new_data list
+    new_data = new_data + [float(i) for i in value_list]
 
     # 수집된 새로운 데이터 return 하기
     return new_data
@@ -308,32 +313,31 @@ def updateMySQL():
 
     # update MySQL data
     try:
-        # get the last row of the table
+        # get new data
         cursor = cnx.cursor()
-        cursor.execute(cursor.execute("SELECT * FROM {} ORDER BY id DESC LIMIT 1".format(table_name)))
-        last_row = cursor.fetchall()
-        print('Last row : ', last_row, '\n')
-
-        # get new data by calling update function
         new_data = update()
-        print('New data to be added :\n', new_data, '\n')
+        print('new_data :', new_data, '\n')
 
-        # check if the new_data is appropriate
-        if new_data[0] != last_row[0][1] + relativedelta(days=1):
-            print('Update cancelled : Incorrect date for new data')
+        # check if new_data already exists in MySQL data table
+        query_string = "SELECT count(*) FROM {} where cdate=%s;".format(table_name)
+        cursor.execute(query_string, new_data[:1])
+        result = cursor.fetchone()
 
-        else:
-            # insert into table
+        # if there is no existing data in the table, insert the new_data to the table
+        if result[0] == 0:
             query_string = 'INSERT INTO {} (cdate, land_wa, jeju_wa) VALUES (%s, %s, %s);'.format(table_name)
             cursor.execute(query_string, new_data)
             cnx.commit()
-            print('New data inserted into MySQL table.')
+            print('New data inserted into MySQL table.\n')
+
+        else:
+            print('Update cancelled : Data already exist in the table\n')
 
     except mysql.connector.Error as error:
         print('Failed to insert into MySQL table {}\n'.format(error))
 
     except:
-        print("Unexpected error:", sys.exc_info()[0], '\n')
+        print("Unexpected error:", sys.exc_info(), '\n')
 
     finally:
         if cnx.is_connected():
@@ -357,9 +361,9 @@ def deleteMySQL():
 
         # delete the target
         cursor = cnx.cursor()
-        cursor.execute("DELETE FROM {} WHERE id = 2362 ".format(table_name))
+        cursor.execute("DELETE FROM {} WHERE id > 2361 ".format(table_name))
         cnx.commit()
-        print('Deletion completed.')
+        print('Deletion completed.\n')
 
     except mysql.connector.Error as error:
         if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
@@ -389,7 +393,7 @@ def main():
 
     # MySQL
     # toMySQL()
-    # updateMySQL()
+    updateMySQL()
     # deleteMySQL()
 
 

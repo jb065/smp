@@ -395,21 +395,18 @@ def updateMySQL():
 
     # update MySQL data
     try:
-        # get the last row of the table
+        # get new data
         cursor = cnx.cursor()
-        cursor.execute(cursor.execute("SELECT * FROM {} ORDER BY id DESC LIMIT 1".format(table_name)))
-        last_row = cursor.fetchall()
-        print('Last row : ', last_row, '\n')
-
-        # get new data by calling update function
         new_data = update()
         print('New data to be added :\n', new_data, '\n')
 
-        # check if the new_data is appropriate
-        if new_data.iloc[0].at['cdate'] != last_row[0][1] + relativedelta(days=1):
-            print('Update cancelled : Incorrect date for new data')
+        # check if new_data already exists in MySQL data table
+        query_string = "SELECT count(*) FROM {} where cdate=%s;".format(table_name)
+        cursor.execute(query_string, new_data.iloc[0].tolist()[:1])
+        result = cursor.fetchone()
 
-        else:
+        # if there is no existing data in the table, insert the new_data to the table
+        if result[0] == 0:
             # insert the new data to the table by taking each row
             for index, row in new_data.iterrows():
                 # insert into table
@@ -418,6 +415,9 @@ def updateMySQL():
                 cursor.execute(query_string, row.values.tolist())
                 cnx.commit()
                 print('New data inserted into MySQL table.')
+
+        else:
+            print('Update cancelled : Data already exist in the table\n')
 
     except mysql.connector.Error as error:
         print('Failed to insert into MySQL table. {}\n'.format(error))
@@ -479,7 +479,7 @@ def main():
 
     # MySQL
     # toMySQL()
-    # updateMySQL()
+    updateMySQL()
     # deleteMySQL()
 
 
