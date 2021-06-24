@@ -21,8 +21,8 @@ cities = [['busan', 98, 76], ['chungbuk', 69, 107], ['chungnam', 68, 100], ['dae
 # 초단기예보 (https://www.data.go.kr/data/15057682/openapi.do)
 def get_ultra():
     # base_time(발표시각) 설정
-    # 30분 단위로 발표하지만, 45분 이후에 호출할 수 있다
-    # 현재시각에서 45분을 뺀 값을 발표시각으로 설정하여 호출할 것
+    # 매시간 30분에 생성되며 약 10분마다 최신 정보로 업데이트됨
+    # 현재시각에서 가장 가까운 30분을 base_time 으로 설정
     base_time = datetime.datetime.now() - datetime.timedelta(minutes=45)
 
     # 도시별 데이터프레임을 저장할 리스트
@@ -37,7 +37,7 @@ def get_ultra():
 
         queryParams = '?' + urlencode({quote_plus('ServiceKey'): key,
                                        quote_plus('pageNo'): '1',
-                                       quote_plus('numOfRows'): '100',
+                                       quote_plus('numOfRows'): '999',
                                        quote_plus('dataType'): 'JSON',
                                        quote_plus('base_date'): base_time.strftime("%Y%m%d"),
                                        quote_plus('base_time'): base_time.strftime("%H%M"),
@@ -122,7 +122,7 @@ def get_village():
 
         queryParams = '?' + urlencode({quote_plus('ServiceKey'): key,
                                        quote_plus('pageNo'): '1',
-                                       quote_plus('numOfRows'): '100',
+                                       quote_plus('numOfRows'): '999',
                                        quote_plus('dataType'): 'JSON',
                                        quote_plus('base_date'): base_time.strftime("%Y%m%d"),
                                        quote_plus('base_time'): base_time.strftime("%H%M"),
@@ -222,7 +222,7 @@ def get_mid():
 
         queryParams = '?' + urlencode({quote_plus('ServiceKey'): key,
                                        quote_plus('pageNo'): '1',
-                                       quote_plus('numOfRows'): '100',
+                                       quote_plus('numOfRows'): '999',
                                        quote_plus('dataType'): 'JSON',
                                        quote_plus('regId'): cities_mid[i][1],  # 목표지점
                                        quote_plus('tmFc'): tmFc.strftime("%Y%m%d%H%M")})  # 발표시각
@@ -491,97 +491,6 @@ def deleteMySQL():
             print('MySQL connection is closed\n')
 
 
-# 동네(단기)예보 (https://www.data.go.kr/data/15057682/openapi.do)
-def test_village():
-    # base_time(발표시각) 설정
-    # 예보 갱신 시간 : 매일 05시,11시,17시,23시
-    now_ = datetime.datetime.now()
-    if now_ < now_.replace(hour=5, minute=0, second=0, microsecond=0):
-        base_time = (now_ - datetime.timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
-    elif now_ < now_.replace(hour=11, minute=0, second=0, microsecond=0):
-        base_time = now_.replace(hour=5, minute=0, second=0, microsecond=0)
-    elif now_ < now_.replace(hour=17, minute=0, second=0, microsecond=0):
-        base_time = now_.replace(hour=11, minute=0, second=0, microsecond=0)
-    elif now_ < now_.replace(hour=23, minute=0, second=0, microsecond=0):
-        base_time = now_.replace(hour=17, minute=0, second=0, microsecond=0)
-    else:
-        base_time = now_.replace(hour=23, minute=0, second=0, microsecond=0)
-
-    # 도시별 데이터프레임을 저장할 리스트
-    dfs = []
-
-    for i in range(0, len(cities)):
-        # 작업 현황 파악을 위한 출력
-        print('Getting village forecast data for', cities[i][0])
-
-        url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService/getVilageFcst'
-        key = 'mhuJYMs8aVw+yxSF4sKzam/E0FlKQ0smUP7wZzcOp25OxpdG9L1lwA4JJuZu8Tlz6Dtzqk++vWDC5p0h56mtVA=='
-
-        queryParams = '?' + urlencode({quote_plus('ServiceKey'): key,
-                                       quote_plus('pageNo'): '1',
-                                       quote_plus('numOfRows'): '100',
-                                       quote_plus('dataType'): 'JSON',
-                                       quote_plus('base_date'): base_time.strftime("%Y%m%d"),
-                                       quote_plus('base_time'): base_time.strftime("%H%M"),
-                                       quote_plus('nx'): cities[i][1],
-                                       quote_plus('ny'): cities[i][2]})
-
-        response = requests.get(url + queryParams)
-        json_response = response.json()
-        df_temp = pd.DataFrame.from_dict(json_response['response']['body']['items']['item'])
-        df_temp = df_temp[df_temp['category'] == 'T3H'].drop('category', axis=1)
-
-        # index 초기화 (0부터 시작하도록)
-        df_temp = df_temp.reset_index(drop=True)
-
-        # 도시명을 나타내는 'city' column 추가
-        df_temp.insert(4, 'city', cities[i][0])
-        # column 순서, 이름을 format 에 맞게 변경
-        df_temp = df_temp[['baseDate', 'baseTime', 'fcstDate', 'fcstTime', 'city', 'nx', 'ny', 'fcstValue']]
-        temp_column = ['base_date', 'base_time', 'target_date', 'target_time', 'city', 'city_x', 'city_y', 'forecast_temp']
-        df_temp.columns = temp_column
-
-        # Data type 변환 (시간값을 str 에서 datetime type 으로 변환)
-        df_temp['base_date'] = df_temp['base_date'].apply(lambda x : datetime.datetime.strptime(x, '%Y%m%d').date())
-        df_temp['base_time'] = df_temp['base_time'].apply(lambda x: datetime.datetime.strptime(x, '%H%M').time())
-        df_temp['target_date'] = df_temp['target_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y%m%d').date())
-        df_temp['target_time'] = df_temp['target_time'].apply(lambda x: datetime.datetime.strptime(x, '%H%M').time())
-        df_temp['city_x'] = df_temp['city_x'].apply(lambda x: float(x))
-        df_temp['city_y'] = df_temp['city_y'].apply(lambda x: float(x))
-        df_temp['forecast_temp'] = df_temp['forecast_temp'].apply(lambda x: float(x))
-
-        # 완성된 데이터프레임을 dfs 리스트에 추가
-        dfs.append(df_temp)
-
-        # 작업 현황 파악을 위한 출력
-        print('Village forecast data collected for', cities[i][0])
-
-    # 도시별 데이터를 종합한 데이터프레임
-    df_village = pd.concat(dfs)
-
-    df_village.to_csv('test.csv', index=True, header=True)
-
-    """
-    # index 초기화 (0부터 시작하도록)
-    df_village = df_village.reset_index(drop=True)
-
-    # base_date, base_time, target_date 에 정렬 후, 인덱스 재설정
-    df_village = df_village.set_index(['base_date', 'base_time', 'target_date', 'target_time'])
-    df_village = df_village.sort_index(axis=0)
-    df_village.reset_index(level=['base_date', 'base_time', 'target_date', 'target_time'], inplace=True)
-
-    # 'base_date' and 'target_date' columns get converted to pandas._libs.tslibs.timestamps.Timestamp type
-    # convert them back to datetime.date type
-    df_village['base_date'] = df_village['base_date'].astype(str)
-    df_village['base_date'] = df_village['base_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d').date())
-    df_village['target_date'] = df_village['target_date'].astype(str)
-    df_village['target_date'] = df_village['target_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d').date())
-
-    # return the collected df_village dataframe
-    return df_village
-    """
-
-
 # main function
 def main():
     # MySQL
@@ -596,6 +505,8 @@ def main():
     # get_village().to_csv('test_village.csv', index=False, header=True)
     # get_mid().to_csv('test_mid.csv', index=False, header=True)
     # test_village()
+
+    get_ultra().to_csv('test.csv', index=True, header=True)
 
 
 if __name__ == '__main__':

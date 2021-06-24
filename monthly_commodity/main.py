@@ -152,6 +152,64 @@ def toMySQL():
 
     print('{}.csv is added to MySQL'.format(data_name))
 
+    # connect to MySQL
+    table_name = 'SMP.eric_{}'.format(data_name)
+    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
+        ip_address = text_file.readline().strip()
+        id = text_file.readline().strip()
+        pw = text_file.readline().strip()
+
+    try:
+        cnx = mysql.connector.connect(user=id, password=pw, host=ip_address, database='SMP')
+    except mysql.connector.Error as error:
+        if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+            print("Something is wrong with your user name or password")
+        elif error.errno == errorcode.ER_BAD_DB_ERROR:
+            print("Database does not exist")
+        else:
+            print(error)
+
+    # set datatype and features / set an unique key
+    try:
+        cursor = cnx.cursor()
+
+        # set datatype and features
+        query_string = "ALTER TABLE {} " \
+                       "CHANGE COLUMN `id` `id` INT NOT NULL AUTO_INCREMENT, " \
+                       "CHANGE COLUMN `cdate` `cdate` DATE NOT NULL, " \
+                       "CHANGE COLUMN `coal_aus` `coal_aus` FLOAT NULL DEFAULT NULL, " \
+                       "CHANGE COLUMN `coal_safrica` `coal_safrica` FLOAT NULL DEFAULT NULL, " \
+                       "CHANGE COLUMN `crude_petro` `crude_petro` FLOAT NULL DEFAULT NULL, " \
+                       "CHANGE COLUMN `crude_brent` `crude_brent` FLOAT NULL, " \
+                       "CHANGE COLUMN `crude_dubai` `crude_dubai` FLOAT NULL DEFAULT NULL, " \
+                       "CHANGE COLUMN `crude_wti` `crude_wti` FLOAT NULL DEFAULT NULL, " \
+                       "CHANGE COLUMN `ngas_index` `ngas_index` FLOAT NULL DEFAULT NULL, " \
+                       "CHANGE COLUMN `ngas_eur` `ngas_eur` FLOAT NULL DEFAULT NULL, " \
+                       "CHANGE COLUMN `ngas_us` `ngas_us` FLOAT NULL DEFAULT NULL, " \
+                       "CHANGE COLUMN `ngas_jp` `ngas_jp` FLOAT NULL DEFAULT NULL, " \
+                       "ADD PRIMARY KEY (`id`);".format(table_name)
+        cursor.execute(query_string)
+        cnx.commit()
+        print('Data type and features are set\n')
+
+        # set an unique key
+        query_string = "ALTER TABLE {} ADD UNIQUE KEY uidx (cdate);".format(table_name)
+        cursor.execute(query_string)
+        cnx.commit()
+        print('Unique Key(uidx) is set\n')
+
+    except mysql.connector.Error as error:
+        print('Failed set datatype and features of MySQL table {}\n'.format(error))
+
+    except:
+        print("Unexpected error:", sys.exc_info(), '\n')
+
+    finally:
+        if cnx.is_connected():
+            cursor.close()
+            cnx.close()
+            print('MySQL connection is closed\n')
+
 
 # update MySQL
 def updateMySQL():
@@ -175,28 +233,18 @@ def updateMySQL():
 
     # update MySQL data
     try:
-        # get the last row of the table
-        cursor = cnx.cursor()
-        cursor.execute(cursor.execute("SELECT * FROM {} ORDER BY id DESC LIMIT 1".format(table_name)))
-        last_row = cursor.fetchall()
-        print('Last row : ', last_row, '\n')
-
         # get new data by calling update function
+        cursor = cnx.cursor()
         new_data = update()
-        print('New data to be added :\n', new_data)
+        print('New data to be added :', new_data, '\n')
 
-        # check if the new_data is appropriate
-        if new_data[0] != last_row[0][1] + relativedelta(months=1):
-            print('Update cancelled : Incorrect month for new data')
-    
-        else:
-            # insert into table
-            query_string = 'INSERT INTO {} (cdate, coal_aus, coal_safrica, crude_petro, crude_brent, crude_dubai, ' \
-                           'crude_wti, ngas_index, ngas_eur, ngas_us, ngas_jp) ' \
-                           'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
-            cursor.execute(query_string, new_data)
-            cnx.commit()
-            print('New data inserted into MySQL table.')
+        # insert into table
+        query_string = 'INSERT INTO {} (cdate, coal_aus, coal_safrica, crude_petro, crude_brent, crude_dubai, ' \
+                       'crude_wti, ngas_index, ngas_eur, ngas_us, ngas_jp) ' \
+                       'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
+        cursor.execute(query_string, new_data)
+        cnx.commit()
+        print('New data inserted into MySQL table.\n')
 
     except mysql.connector.Error as error:
         print('Failed to insert into MySQL table. {}\n'.format(error))
@@ -226,9 +274,9 @@ def deleteMySQL():
 
         # delete the target
         cursor = cnx.cursor()
-        cursor.execute(cursor.execute("DELETE FROM {} WHERE id = 78".format(table_name)))
+        cursor.execute(cursor.execute("DELETE FROM {} WHERE id > 78".format(table_name)))
         cnx.commit()
-        print('Deletion completed.')
+        print('Deletion completed.\n')
 
     except mysql.connector.Error as error:
         if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:

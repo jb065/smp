@@ -372,6 +372,58 @@ def toMySQL():
 
     print('{}.csv is added to MySQL'.format(data_name))
 
+    # connect to MySQL
+    table_name = 'SMP.eric_{}'.format(data_name)
+    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
+        ip_address = text_file.readline().strip()
+        id = text_file.readline().strip()
+        pw = text_file.readline().strip()
+
+    try:
+        cnx = mysql.connector.connect(user=id, password=pw, host=ip_address, database='SMP')
+    except mysql.connector.Error as error:
+        if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+            print("Something is wrong with your user name or password")
+        elif error.errno == errorcode.ER_BAD_DB_ERROR:
+            print("Database does not exist")
+        else:
+            print(error)
+
+    # set datatype and features / set an unique key
+    try:
+        cursor = cnx.cursor()
+
+        # set datatype and features
+        query_string = "ALTER TABLE {} " \
+                       "CHANGE COLUMN `id` `id` INT NOT NULL AUTO_INCREMENT, " \
+                       "CHANGE COLUMN `cdate` `cdate` DATE NOT NULL, " \
+                       "CHANGE COLUMN `ctime` `ctime` TIME NOT NULL, " \
+                       "CHANGE COLUMN `city` `city` VARCHAR(20) NOT NULL, " \
+                       "CHANGE COLUMN `city_code` `city_code` INT NOT NULL, " \
+                       "CHANGE COLUMN `temp` `temp` FLOAT NULL DEFAULT NULL, " \
+                       "ADD PRIMARY KEY (`id`);".format(table_name)
+        cursor.execute(query_string)
+        cnx.commit()
+        print('Data type and features are set\n')
+
+        # set an unique key
+        query_string = "ALTER TABLE {} ADD UNIQUE KEY uidx (cdate, ctime, city);".format(table_name)
+        cursor.execute(query_string)
+        cnx.commit()
+        print('Unique Key(uidx) is set\n')
+
+    except mysql.connector.Error as error:
+        print('Failed set datatype and features of MySQL table {}\n'.format(error))
+
+    except:
+        print("Unexpected error:", sys.exc_info(), '\n')
+
+    finally:
+        if cnx.is_connected():
+            cursor.close()
+            cnx.close()
+            print('MySQL connection is closed\n')
+
 
 # update MySQL
 def updateMySQL():
@@ -393,22 +445,15 @@ def updateMySQL():
         else:
             print(error)
 
-    # update MySQL data
+    # get new data
+    cursor = cnx.cursor()
+    new_data = update()
+    print('New data to be added :\n', new_data, '\n')
+
+    # insert the new data to the table by taking each row
     try:
-        # get new data
-        cursor = cnx.cursor()
-        new_data = update()
-        print('New data to be added :\n', new_data, '\n')
-
-        # check if new_data already exists in MySQL data table
-        query_string = "SELECT count(*) FROM {} where cdate=%s;".format(table_name)
-        cursor.execute(query_string, new_data.iloc[0].tolist()[:1])
-        result = cursor.fetchone()
-
-        # if there is no existing data in the table, insert the new_data to the table
-        if result[0] == 0:
-            # insert the new data to the table by taking each row
-            for index, row in new_data.iterrows():
+        for index, row in new_data.iterrows():
+            try:
                 # insert into table
                 query_string = 'INSERT INTO {} (cdate, ctime, city, city_code, temp) ' \
                                'VALUES (%s, %s, %s, %s, %s);'.format(table_name)
@@ -416,8 +461,11 @@ def updateMySQL():
                 cnx.commit()
                 print('New data inserted into MySQL table.')
 
-        else:
-            print('Update cancelled : Data already exist in the table\n')
+            except mysql.connector.Error as error:
+                print('Failed to insert into MySQL table. {}\n'.format(error))
+
+            except:
+                print("Unexpected error:", sys.exc_info(), '\n')
 
     except mysql.connector.Error as error:
         print('Failed to insert into MySQL table. {}\n'.format(error))
@@ -479,7 +527,7 @@ def main():
 
     # MySQL
     # toMySQL()
-    updateMySQL()
+    # updateMySQL()
     # deleteMySQL()
 
 
