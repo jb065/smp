@@ -368,9 +368,9 @@ def toMySQL():
 
     csv_data = pd.read_csv('{}.csv'.format(data_name))
     engine = create_engine('mysql+mysqldb://{}:{}@{}:3306/SMP'.format(id, pw, ip_address), echo=False)
-    csv_data.to_sql(name='eric_{}'.format(data_name), con=engine, if_exists='replace', index=False)
+    csv_data.to_sql(name='eric_{}'.format(data_name), con=engine, if_exists='replace', index=False, chunksize=10000)
 
-    print('{}.csv is added to MySQL'.format(data_name))
+    print('{}.csv is added to MySQL\n'.format(data_name))
 
     # connect to MySQL
     table_name = 'SMP.eric_{}'.format(data_name)
@@ -462,10 +462,10 @@ def updateMySQL():
                 print('New data inserted into MySQL table.')
 
             except mysql.connector.Error as error:
-                print('Failed to insert into MySQL table. {}\n'.format(error))
+                print('Failed to insert into MySQL table. {}'.format(error))
 
             except:
-                print("Unexpected error:", sys.exc_info(), '\n')
+                print("Unexpected error:", sys.exc_info())
 
     except mysql.connector.Error as error:
         print('Failed to insert into MySQL table. {}\n'.format(error))

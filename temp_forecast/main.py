@@ -28,9 +28,10 @@ def get_ultra():
     # 도시별 데이터프레임을 저장할 리스트
     dfs = []
 
+    # for every city in the list
     for i in range(0, len(cities)):
         # 작업 현황 파악을 위한 출력
-        print('Getting ultra-fast forecast data for', cities[i][0])
+        print(cities[i][0], ': Getting ultra-fast forecast data')
 
         url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService/getUltraSrtFcst'
         key = 'mhuJYMs8aVw+yxSF4sKzam/E0FlKQ0smUP7wZzcOp25OxpdG9L1lwA4JJuZu8Tlz6Dtzqk++vWDC5p0h56mtVA=='
@@ -46,52 +47,67 @@ def get_ultra():
 
         response = requests.get(url + queryParams)
         json_response = response.json()
-        df_temp = pd.DataFrame.from_dict(json_response['response']['body']['items']['item'])
-        df_temp = df_temp[df_temp['category'] == 'T1H'].drop('category', axis=1)
+        result_code = json_response['response']['header']['resultCode']
 
+        # result_code(3) : If base_time is set to future time
+        if result_code == 3:
+            print(cities[i][0], ': Error in calling API (No data)\n')
+        # result_code(99) : If base_time is set to time that is past more than a day
+        elif result_code == 99:
+            print(cities[i][0], ': Error in calling API (API provides data for the last 1 day)\n')
+        # result_code(0) : If data is appropriately collected
+        else:
+            df_temp = pd.DataFrame.from_dict(json_response['response']['body']['items']['item'])
+            df_temp = df_temp[df_temp['category'] == 'T1H'].drop('category', axis=1)
+
+            # index 초기화 (0부터 시작하도록)
+            df_temp = df_temp.reset_index(drop=True)
+
+            # 도시명을 나타내는 'city' column 추가
+            df_temp.insert(4, 'city', cities[i][0])
+            # column 순서, 이름을 format 에 맞게 변경
+            df_temp = df_temp[['baseDate', 'baseTime', 'fcstDate', 'fcstTime', 'city', 'nx', 'ny', 'fcstValue']]
+            temp_column = ['base_date', 'base_time', 'target_date', 'target_time', 'city', 'city_x', 'city_y', 'forecast_temp']
+            df_temp.columns = temp_column
+
+            # Data type 변환 (시간값을 str 에서 datetime type 으로 변환)
+            df_temp['base_date'] = df_temp['base_date'].apply(lambda x : datetime.datetime.strptime(x, '%Y%m%d').date())
+            df_temp['base_time'] = df_temp['base_time'].apply(lambda x: datetime.datetime.strptime(x, '%H%M').time())
+            df_temp['target_date'] = df_temp['target_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y%m%d').date())
+            df_temp['target_time'] = df_temp['target_time'].apply(lambda x: datetime.datetime.strptime(x, '%H%M').time())
+            df_temp['city_x'] = df_temp['city_x'].apply(lambda x: float(x))
+            df_temp['city_y'] = df_temp['city_y'].apply(lambda x: float(x))
+            df_temp['forecast_temp'] = df_temp['forecast_temp'].apply(lambda x: float(x))
+
+            # 완성된 데이터프레임을 dfs 리스트에 추가
+            dfs.append(df_temp)
+
+            # 작업 현황 출력
+            print(cities[i][0], ': Ultra-fast forecast data collected')
+
+    # if there are any dataframe collected, merge them
+    if len(dfs) > 1:
+        # 도시별 데이터를 종합한 데이터프레임
+        df_ultra = pd.concat(dfs)
         # index 초기화 (0부터 시작하도록)
-        df_temp = df_temp.reset_index(drop=True)
+        df_ultra = df_ultra.reset_index(drop=True)
 
-        # 도시명을 나타내는 'city' column 추가
-        df_temp.insert(4, 'city', cities[i][0])
-        # column 순서, 이름을 format 에 맞게 변경
-        df_temp = df_temp[['baseDate', 'baseTime', 'fcstDate', 'fcstTime', 'city', 'nx', 'ny', 'fcstValue']]
-        temp_column = ['base_date', 'base_time', 'target_date', 'target_time', 'city', 'city_x', 'city_y', 'forecast_temp']
-        df_temp.columns = temp_column
+        # base_date, base_time, target_date 에 정렬 후, 인덱스 재설정
+        df_ultra = df_ultra.set_index(['base_date', 'base_time', 'target_date', 'target_time'])
+        df_ultra = df_ultra.sort_index(axis=0)
+        df_ultra.reset_index(level=['base_date', 'base_time', 'target_date', 'target_time'], inplace=True)
 
-        # Data type 변환 (시간값을 str 에서 datetime type 으로 변환)
-        df_temp['base_date'] = df_temp['base_date'].apply(lambda x : datetime.datetime.strptime(x, '%Y%m%d').date())
-        df_temp['base_time'] = df_temp['base_time'].apply(lambda x: datetime.datetime.strptime(x, '%H%M').time())
-        df_temp['target_date'] = df_temp['target_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y%m%d').date())
-        df_temp['target_time'] = df_temp['target_time'].apply(lambda x: datetime.datetime.strptime(x, '%H%M').time())
-        df_temp['city_x'] = df_temp['city_x'].apply(lambda x: float(x))
-        df_temp['city_y'] = df_temp['city_y'].apply(lambda x: float(x))
-        df_temp['forecast_temp'] = df_temp['forecast_temp'].apply(lambda x: float(x))
+        # 'base_date' and 'target_date' columns get converted to pandas._libs.tslibs.timestamps.Timestamp type
+        # convert them back to datetime.date type
+        df_ultra['base_date'] = df_ultra['base_date'].astype(str)
+        df_ultra['base_date'] = df_ultra['base_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d').date())
+        df_ultra['target_date'] = df_ultra['target_date'].astype(str)
+        df_ultra['target_date'] = df_ultra['target_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d').date())
 
-        # 완성된 데이터프레임을 dfs 리스트에 추가
-        dfs.append(df_temp)
+        return df_ultra
 
-        # 작업 현황 출력
-        print('Ultra-fast forecast data collected for', cities[i][0])
-
-    # 도시별 데이터를 종합한 데이터프레임
-    df_ultra = pd.concat(dfs)
-    # index 초기화 (0부터 시작하도록)
-    df_ultra = df_ultra.reset_index(drop=True)
-
-    # base_date, base_time, target_date 에 정렬 후, 인덱스 재설정
-    df_ultra = df_ultra.set_index(['base_date', 'base_time', 'target_date', 'target_time'])
-    df_ultra = df_ultra.sort_index(axis=0)
-    df_ultra.reset_index(level=['base_date', 'base_time', 'target_date', 'target_time'], inplace=True)
-
-    # 'base_date' and 'target_date' columns get converted to pandas._libs.tslibs.timestamps.Timestamp type
-    # convert them back to datetime.date type
-    df_ultra['base_date'] = df_ultra['base_date'].astype(str)
-    df_ultra['base_date'] = df_ultra['base_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d').date())
-    df_ultra['target_date'] = df_ultra['target_date'].astype(str)
-    df_ultra['target_date'] = df_ultra['target_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d').date())
-
-    return df_ultra
+    else:
+        return 'No data is collected'
 
 
 # 동네(단기)예보 (https://www.data.go.kr/data/15057682/openapi.do)
@@ -115,7 +131,7 @@ def get_village():
 
     for i in range(0, len(cities)):
         # 작업 현황 파악을 위한 출력
-        print('Getting village forecast data for', cities[i][0])
+        print(cities[i][0], ': Getting village forecast data')
 
         url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService/getVilageFcst'
         key = 'mhuJYMs8aVw+yxSF4sKzam/E0FlKQ0smUP7wZzcOp25OxpdG9L1lwA4JJuZu8Tlz6Dtzqk++vWDC5p0h56mtVA=='
@@ -157,7 +173,7 @@ def get_village():
         dfs.append(df_temp)
 
         # 작업 현황 파악을 위한 출력
-        print('Village forecast data collected for', cities[i][0])
+        print(cities[i][0], ': Village forecast data collected')
 
     # 도시별 데이터를 종합한 데이터프레임
     df_village = pd.concat(dfs)
@@ -207,7 +223,7 @@ def get_mid():
 
     for i in range(0, len(cities_mid)):
         # 작업 현황 파악을 위한 출력
-        print('Getting mid forecast data for', cities_mid[i][0])
+        print(cities_mid[i][0], ': Getting mid forecast data')
 
         url = 'http://apis.data.go.kr/1360000/MidFcstInfoService/getMidTa'
         key = 'mhuJYMs8aVw+yxSF4sKzam/E0FlKQ0smUP7wZzcOp25OxpdG9L1lwA4JJuZu8Tlz6Dtzqk++vWDC5p0h56mtVA=='
@@ -248,6 +264,8 @@ def get_mid():
             df_format.loc[len(df_format)] = new_data
             target_date = target_date + relativedelta(days=1)
         dfs.append(df_format)
+
+        print(cities_mid[i][0], ': Mid forecast data collected')
 
     # 도시별 데이터를 종합한 데이터프레임
     df_mid = pd.concat(dfs)
@@ -506,7 +524,8 @@ def main():
     # get_mid().to_csv('test_mid.csv', index=False, header=True)
     # test_village()
 
-    get_ultra().to_csv('test.csv', index=True, header=True)
+    # get_ultra().to_csv('test.csv', index=True, header=True)
+    print(get_mid())
 
 
 if __name__ == '__main__':

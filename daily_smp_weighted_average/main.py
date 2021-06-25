@@ -287,10 +287,9 @@ def toMySQL():
 
     csv_data = pd.read_csv('{}.csv'.format(data_name))
     engine = create_engine('mysql+mysqldb://{}:{}@{}:3306/SMP'.format(id, pw, ip_address), echo=False)
-    csv_data.to_sql(name='eric_{}'.format(data_name), con=engine, if_exists='replace', index=False)
+    csv_data.to_sql(name='eric_{}'.format(data_name), con=engine, if_exists='replace', index=False, chunksize=10000)
 
     print('{}.csv is added to MySQL\n'.format(data_name))
-
 
     # connect to MySQL
     table_name = 'SMP.eric_{}'.format(data_name)
