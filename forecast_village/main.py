@@ -9,6 +9,7 @@ import mysql.connector
 from mysql.connector import errorcode
 from sqlalchemy import create_engine
 import sys
+import time
 
 
 # 도시 목록 [도시이름, x좌표, y좌표] / 초단기, 동네예보
@@ -18,90 +19,131 @@ cities = [['busan', 98, 76], ['chungbuk', 69, 107], ['chungnam', 68, 100], ['dae
           ['sejong', 66, 103], ['seoul', 60, 127], ['ulsan', 102, 84]]
 
 
+# returns template of dataframe based on base_time
+def get_template(base_time):
+    # get values for dataframe
+    num_forecast = int (22 - (base_time.hour - 5) / 3)
+    target_time = base_time + datetime.timedelta(hours=4)
+    target_column = []
+    for i in range(0, num_forecast):
+        target_column = target_column + [target_time + datetime.timedelta(hours=i*3)] * len(cities)
+
+    city_name = []
+    city_x = []
+    city_y = []
+    for city in cities:
+        city_name.append(city[0])
+        city_x.append(city[1])
+        city_y.append(city[2])
+
+    # create dataframe
+    df = pd.DataFrame(index=np.arange(len(cities) * num_forecast),
+                      columns=['base_date', 'base_time', 'target_date', 'target_time', 'city', 'city_x', 'city_y', 'forecast_temp'])
+    df['base_date'] = base_time.date()
+    df['base_time'] = base_time.time()
+    df['target_date'] = [t.date() for t in target_column]
+    df['target_time'] = [t.time() for t in target_column]
+    df['city'] = city_name * num_forecast
+    df['city_x'] = city_x * num_forecast
+    df['city_y'] = city_y * num_forecast
+
+    return df
+
+
 # 동네(단기)예보 (https://www.data.go.kr/data/15057682/openapi.do)
 def get_village():
     # base_time(발표시각) 설정
-    # 예보 갱신 시간 : 매일 05시,11시,17시,23시
+    # API base_time : 0200, 0500, 0800, 1100, 1400, 1700, 2000, 2300 (8 times per day)
+    # API available 5 minutes after base_time
     now_ = datetime.datetime.now()
-    if now_ < now_.replace(hour=5, minute=0, second=0, microsecond=0):
-        base_time = (now_ - datetime.timedelta(days=1)).replace(hour=23, minute=0, second=0, microsecond=0)
-    elif now_ < now_.replace(hour=11, minute=0, second=0, microsecond=0):
-        base_time = now_.replace(hour=5, minute=0, second=0, microsecond=0)
-    elif now_ < now_.replace(hour=17, minute=0, second=0, microsecond=0):
-        base_time = now_.replace(hour=11, minute=0, second=0, microsecond=0)
-    elif now_ < now_.replace(hour=23, minute=0, second=0, microsecond=0):
-        base_time = now_.replace(hour=17, minute=0, second=0, microsecond=0)
+    if now_.hour % 3 == 2 and now_.minute > 5:
+        base_time = now_.replace(minute=0, second=0, microsecond=0)
+    elif now_.hour % 3 == 2 and now_.minute <= 5:
+        base_time = now_.replace(hour=now_.hour - 3, minute=0, second=0, microsecond=0)
     else:
-        base_time = now_.replace(hour=23, minute=0, second=0, microsecond=0)
+        base_time = now_.replace(hour=now_.hour - (3 - now_.hour % 3), minute=0, second=0, microsecond=0)
 
-    # 도시별 데이터프레임을 저장할 리스트
-    dfs = []
+    df_template = get_template(base_time)
 
-    for i in range(0, len(cities)):
-        # 작업 현황 파악을 위한 출력
-        print(cities[i][0], ': Getting village forecast data')
+    # try collecting data from API for 5 times
+    for j in range(0, 5):
+        print('Trial {} : Getting forecast_village based on'.format(j+1), base_time, '\n')
+        api_error = False
+        dfs = []
 
-        url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService/getVilageFcst'
-        key = 'mhuJYMs8aVw+yxSF4sKzam/E0FlKQ0smUP7wZzcOp25OxpdG9L1lwA4JJuZu8Tlz6Dtzqk++vWDC5p0h56mtVA=='
+        # for every city in the list
+        for i in range(0, len(cities)):
+            # 작업 현황 파악을 위한 출력
+            print(cities[i][0], ': Getting village forecast data')
 
-        queryParams = '?' + urlencode({quote_plus('ServiceKey'): key,
-                                       quote_plus('pageNo'): '1',
-                                       quote_plus('numOfRows'): '999',
-                                       quote_plus('dataType'): 'JSON',
-                                       quote_plus('base_date'): base_time.strftime("%Y%m%d"),
-                                       quote_plus('base_time'): base_time.strftime("%H%M"),
-                                       quote_plus('nx'): cities[i][1],
-                                       quote_plus('ny'): cities[i][2]})
+            url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService/getVilageFcst'
+            key = 'mhuJYMs8aVw+yxSF4sKzam/E0FlKQ0smUP7wZzcOp25OxpdG9L1lwA4JJuZu8Tlz6Dtzqk++vWDC5p0h56mtVA=='
+            queryParams = '?' + urlencode({quote_plus('ServiceKey'): key,
+                                           quote_plus('pageNo'): '1',
+                                           quote_plus('numOfRows'): '999',
+                                           quote_plus('dataType'): 'JSON',
+                                           quote_plus('base_date'): base_time.strftime("%Y%m%d"),
+                                           quote_plus('base_time'): base_time.strftime("%H%M"),
+                                           quote_plus('nx'): cities[i][1],
+                                           quote_plus('ny'): cities[i][2]})
 
-        response = requests.get(url + queryParams)
-        json_response = response.json()
-        df_temp = pd.DataFrame.from_dict(json_response['response']['body']['items']['item'])
-        df_temp = df_temp[df_temp['category'] == 'T3H'].drop('category', axis=1)
+            response = requests.get(url + queryParams)
+            json_response = response.json()
+            result_code = json_response['response']['header']['resultCode']
 
-        # index 초기화 (0부터 시작하도록)
-        df_temp = df_temp.reset_index(drop=True)
+            # result_code(99) : If base_time is invalid. Retry after 2 min
+            if result_code != '00':
+                print(cities[i][0], ': Error in calling API (Invalid base_time {})\n'.format(base_time))
 
-        # 도시명을 나타내는 'city' column 추가
-        df_temp.insert(4, 'city', cities[i][0])
-        # column 순서, 이름을 format 에 맞게 변경
-        df_temp = df_temp[['baseDate', 'baseTime', 'fcstDate', 'fcstTime', 'city', 'nx', 'ny', 'fcstValue']]
-        temp_column = ['base_date', 'base_time', 'target_date', 'target_time', 'city', 'city_x', 'city_y', 'forecast_temp']
-        df_temp.columns = temp_column
+            # result_code(00) : If data is appropriately collected
+            else:
+                # make a dataframe 'df_temp' that contains new data
+                df_temp = pd.DataFrame.from_dict(json_response['response']['body']['items']['item'])
+                df_temp = df_temp[df_temp['category'] == 'T3H'].drop('category', axis=1)
+                df_temp = df_temp.reset_index(drop=True)
 
-        # Data type 변환 (시간값을 str 에서 datetime type 으로 변환)
-        df_temp['base_date'] = df_temp['base_date'].apply(lambda x : datetime.datetime.strptime(x, '%Y%m%d').date())
-        df_temp['base_time'] = df_temp['base_time'].apply(lambda x: datetime.datetime.strptime(x, '%H%M').time())
-        df_temp['target_date'] = df_temp['target_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y%m%d').date())
-        df_temp['target_time'] = df_temp['target_time'].apply(lambda x: datetime.datetime.strptime(x, '%H%M').time())
-        df_temp['city_x'] = df_temp['city_x'].apply(lambda x: float(x))
-        df_temp['city_y'] = df_temp['city_y'].apply(lambda x: float(x))
-        df_temp['forecast_temp'] = df_temp['forecast_temp'].apply(lambda x: float(x))
+                # set names and order of columns
+                df_temp.insert(4, 'city', cities[i][0])
+                df_temp = df_temp[['baseDate', 'baseTime', 'fcstDate', 'fcstTime', 'city', 'nx', 'ny', 'fcstValue']]
+                df_temp.columns = ['base_date', 'base_time', 'target_date', 'target_time', 'city', 'city_x', 'city_y', 'forecast_temp']
 
-        # 완성된 데이터프레임을 dfs 리스트에 추가
-        dfs.append(df_temp)
+                # Data type 변환
+                df_temp['base_date'] = df_temp['base_date'].apply(lambda x : datetime.datetime.strptime(x, '%Y%m%d').date())
+                df_temp['base_time'] = df_temp['base_time'].apply(lambda x: datetime.datetime.strptime(x, '%H%M').time())
+                df_temp['target_date'] = df_temp['target_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y%m%d').date())
+                df_temp['target_time'] = df_temp['target_time'].apply(lambda x: datetime.datetime.strptime(x, '%H%M').time())
+                df_temp['city_x'] = df_temp['city_x'].apply(lambda x: int(x))
+                df_temp['city_y'] = df_temp['city_y'].apply(lambda x: int(x))
+                df_temp['forecast_temp'] = df_temp['forecast_temp'].apply(lambda x: float(x))
 
-        # 작업 현황 파악을 위한 출력
-        print(cities[i][0], ': Village forecast data collected')
+                # 완성된 데이터프레임을 dfs 리스트에 추가
+                dfs.append(df_temp)
+                print(cities[i][0], ': forecast_village data collected')
+                api_error = False
 
-    # 도시별 데이터를 종합한 데이터프레임
-    df_village = pd.concat(dfs)
-    # index 초기화 (0부터 시작하도록)
-    df_village = df_village.reset_index(drop=True)
+        # if there is an error in API, retry after 2 minutes
+        if api_error:
+            time.sleep(600)
+        else:
+            break
 
-    # base_date, base_time, target_date 에 정렬 후, 인덱스 재설정
-    df_village = df_village.set_index(['base_date', 'base_time', 'target_date', 'target_time'])
-    df_village = df_village.sort_index(axis=0)
-    df_village.reset_index(level=['base_date', 'base_time', 'target_date', 'target_time'], inplace=True)
+    if not api_error:
+        # 도시별 데이터를 종합한 데이터프레임
+        df_village = pd.concat(dfs)
+        df_village = df_village.reset_index(drop=True)
 
-    # 'base_date' and 'target_date' columns get converted to pandas._libs.tslibs.timestamps.Timestamp type
-    # convert them back to datetime.date type
-    df_village['base_date'] = df_village['base_date'].astype(str)
-    df_village['base_date'] = df_village['base_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d').date())
-    df_village['target_date'] = df_village['target_date'].astype(str)
-    df_village['target_date'] = df_village['target_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d').date())
+        # base_date, base_time, target_date 에 정렬 후, 인덱스 재설정
+        df_village = df_village.set_index(['base_date', 'base_time', 'target_date', 'target_time'])
+        df_village = df_village.sort_index(axis=0)
+        df_village.reset_index(level=['base_date', 'base_time', 'target_date', 'target_time'], inplace=True)
 
-    # return the collected df_village dataframe
-    return df_village
+        # combine the template dataframe and the collected data, then return it
+        df_result = df_template.combine_first(df_village)
+        return df_result
+
+    # if error in API still happens after 5 trials, return df_template (dataframe without data)
+    else:
+        return df_template
 
 
 # csv file to MySQL
@@ -198,22 +240,30 @@ def updateMySQL():
 
     # update MySQL data
     try:
+        # get new data
         cursor = cnx.cursor()
-        # get new dataframe
-        df_village = get_village()
-        print('\nVillage forecast data:\n', df_village)
+        new_data = get_village()
 
-        # insert each row of df_ultra to MySQL
-        for index, row in df_village.iterrows():
-            # insert into table
-            query_string = 'INSERT INTO {} (base_date, base_time, target_date, target_time, city, city_x, city_y, ' \
-                           'forecast_temp) VALUES (%s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
-            cursor.execute(query_string, row.values.tolist())
+        # check if any new data is collected
+        if type(new_data) == str:
+            print('updateMySQL cancelled : No data is collected\n')
+        else:
+            print('\nVillage forecast data:\n', new_data)
+            # insert each row of df_ultra to MySQL
+            for index, row in new_data.iterrows():
+                try:
+                    # insert into table
+                    query_string = 'INSERT INTO {} (base_date, base_time, target_date, target_time, city, city_x, city_y, ' \
+                                   'forecast_temp) VALUES (%s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
+                    cursor.execute(query_string, row.values.tolist())
+                    cnx.commit()
+                    print('New data inserted into MySQL table.')
 
-            # commit : make changes persistent to the database
-            cnx.commit()
-            # print status
-            print('New data inserted into MySQL table.')
+                except mysql.connector.Error as error:
+                    print('Failed to insert into MySQL table. {}'.format(error))
+
+                except:
+                    print("Unexpected error:", sys.exc_info(), '\n')
 
     except mysql.connector.Error as error:
         print('Failed to insert into MySQL table. {}\n'.format(error))
@@ -230,7 +280,7 @@ def updateMySQL():
 
 # delete rows in MySQL
 def deleteMySQL():
-    table_name = 'SMP.eric_forecast_mid'
+    table_name = 'SMP.eric_forecast_village'
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
@@ -243,7 +293,7 @@ def deleteMySQL():
 
         # delete the target
         cursor = cnx.cursor()
-        cursor.execute(cursor.execute("DELETE FROM {}".format(table_name)))
+        cursor.execute("DELETE FROM {} WHERE id > 1485".format(table_name))
         cnx.commit()
         print('Deletion completed.')
 
@@ -268,7 +318,7 @@ def deleteMySQL():
 # main function
 def main():
     # MySQL
-    toMySQL()
+    # toMySQL()
     # updateMySQL()
     # deleteMySQL()
 

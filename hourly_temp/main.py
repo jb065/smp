@@ -445,13 +445,13 @@ def updateMySQL():
         else:
             print(error)
 
-    # get new data
-    cursor = cnx.cursor()
-    new_data = update()
-    print('New data to be added :\n', new_data, '\n')
-
     # insert the new data to the table by taking each row
     try:
+        # get new data
+        cursor = cnx.cursor()
+        new_data = update()
+        print('New data to be added :\n', new_data, '\n')
+        
         for index, row in new_data.iterrows():
             try:
                 # insert into table

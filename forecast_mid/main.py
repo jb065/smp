@@ -9,13 +9,43 @@ import mysql.connector
 from mysql.connector import errorcode
 from sqlalchemy import create_engine
 import sys
+import time
+
 
 # 도시 목록 [도시이름, 도시코드]
-cities_mid = [['busan', '11H20201'], ['chungbuk', '11C10301'], ['chungnam', '11C20401'], ['daegu', '11H10701'],
+cities = [['busan', '11H20201'], ['chungbuk', '11C10301'], ['chungnam', '11C20401'], ['daegu', '11H10701'],
               ['daejeon', '11C20401'], ['gangwon', '11D10301'], ['gwangju', '11F20501'], ['gyeongbuk', '11H10701'],
               ['gyeonggi', '11B20601'], ['gyeongnam', '11H20301'], ['incheon', '11B20201'], ['jeju', '11G00201'],
               ['jeonbuk', '11F10201'], ['jeonnam', '21F20804'], ['sejong', '11C20404'], ['seoul', '11B10101'],
               ['ulsan', '11H20101']]
+
+
+# returns template of dataframe based on base_time
+def get_template(base_time):
+    # get values for dataframe
+    num_forecast = 8
+    target_time = base_time + relativedelta(days=3)
+
+    target_column = []
+    for i in range(0, num_forecast):
+        target_column = target_column + [target_time + relativedelta(days=i)] * len(cities)
+
+    city_name = []
+    city_code = []
+    for city in cities:
+        city_name.append(city[0])
+        city_code.append(city[1])
+
+    # create dataframe
+    df = pd.DataFrame(index=np.arange(len(cities) * num_forecast),
+                      columns=['base_date', 'base_time', 'target_date', 'city', 'city_code', 'temp_min', 'temp_max'])
+    df['base_date'] = base_time.date()
+    df['base_time'] = base_time.time()
+    df['target_date'] = [t.date() for t in target_column]
+    df['city'] = city_name * num_forecast
+    df['city_code'] = city_code * num_forecast
+
+    return df
 
 
 # 중기기온예보 (https://www.data.go.kr/data/15059468/openapi.do)
@@ -30,81 +60,100 @@ def get_mid():
     else:
         tmFc = now_.replace(hour=18, minute=0, second=0, microsecond=0)
 
-    # 작업 현황 출력
-    print('Getting mid forecast based on', tmFc, '\n')
+    df_template = get_template(tmFc)
 
-    # 도시별 데이터프레임을 저장할 리스트
-    dfs = []
+    # try collecting data from API for 5 times
+    for j in range(0, 5):
+        print('Trial {} : Getting forecast_mid based on'.format(j+1), tmFc, '\n')
+        api_error = False
+        dfs = []
 
-    for i in range(0, len(cities_mid)):
-        # 작업 현황 파악을 위한 출력
-        print(cities_mid[i][0], ': Getting mid forecast data')
+        for i in range(0, len(cities)):
+            print(cities[i][0], ': Getting mid forecast data')
 
-        url = 'http://apis.data.go.kr/1360000/MidFcstInfoService/getMidTa'
-        key = 'mhuJYMs8aVw+yxSF4sKzam/E0FlKQ0smUP7wZzcOp25OxpdG9L1lwA4JJuZu8Tlz6Dtzqk++vWDC5p0h56mtVA=='
+            url = 'http://apis.data.go.kr/1360000/MidFcstInfoService/getMidTa'
+            key = 'mhuJYMs8aVw+yxSF4sKzam/E0FlKQ0smUP7wZzcOp25OxpdG9L1lwA4JJuZu8Tlz6Dtzqk++vWDC5p0h56mtVA=='
 
-        # 첫번째 지역일 경우, 새로운 데이터프레임 설정
-        if i == 0:
-            # 저장할 데이터프레임 columns 설정 (tmFc, regId, D+3, D+4 ... D+10)
-            cols = ['city', 'base_time']
-            for j in range(3, 11):
-                cols.append((tmFc + datetime.timedelta(days=j)).strftime("%Y%m%d"))
-            df_result = pd.DataFrame(columns=cols)
+            """
+            # 첫번째 지역일 경우, 새로운 데이터프레임 설정
+            if i == 0:
+                # 저장할 데이터프레임 columns 설정 (tmFc, regId, D+3, D+4 ... D+10)
+                cols = ['city', 'base_time']
+                for j in range(3, 11):
+                    cols.append((tmFc + datetime.timedelta(days=j)).strftime("%Y%m%d"))
+                df_result = pd.DataFrame(columns=cols)
+            """
 
-        queryParams = '?' + urlencode({quote_plus('ServiceKey'): key,
-                                       quote_plus('pageNo'): '1',
-                                       quote_plus('numOfRows'): '999',
-                                       quote_plus('dataType'): 'JSON',
-                                       quote_plus('regId'): cities_mid[i][1],  # 목표지점
-                                       quote_plus('tmFc'): tmFc.strftime("%Y%m%d%H%M")})  # 발표시각
+            queryParams = '?' + urlencode({quote_plus('ServiceKey'): key,
+                                           quote_plus('pageNo'): '1',
+                                           quote_plus('numOfRows'): '999',
+                                           quote_plus('dataType'): 'JSON',
+                                           quote_plus('regId'): cities[i][1],  # 목표지점
+                                           quote_plus('tmFc'): tmFc.strftime("%Y%m%d%H%M")})  # 발표시각
 
-        response = requests.get(url + queryParams)
-        json_response = response.json()
-        df_temp = pd.DataFrame.from_dict(json_response['response']['body']['items']['item'])
-        df_temp = df_temp[
-            ['taMin3', 'taMax3', 'taMin4', 'taMax4', 'taMin5', 'taMax5', 'taMin6', 'taMax6', 'taMin7', 'taMax7',
-             'taMin8', 'taMax8', 'taMin9', 'taMax9', 'taMin10', 'taMax10']]
+            response = requests.get(url + queryParams)
+            json_response = response.json()
+            result_code = json_response['response']['header']['resultCode']
 
-        # 날짜별 데이터값을 갖는 리스트
-        temp_data = df_temp.loc[0].tolist()
+            # result_code(03) : No data provided by API. Retry after 2 min
+            if result_code == '03':
+                print(cities[i][0], ': Error in calling API (No data)\n')
+                api_error = True
+                break
 
-        # format 에 맞는 데이터프레임 생성
-        column_format = ['base_date', 'base_time', 'target_date', 'city', 'city_code', 'temp_min', 'temp_max']
-        df_format = pd.DataFrame(columns=column_format)
+            # result_code(99) : If base_time is set to time that is past more than a day. Return dataframe without data
+            elif result_code == '99':
+                print(cities[i][0], ': Error in calling API (API provides data for past 1 day)\n')
+                return df_template
 
-        # 데이터 추가
-        target_date = tmFc.date() + relativedelta(days=3)
-        for j in range(0, 8):
-            new_data = [tmFc.date(), tmFc.time(), target_date, cities_mid[i][0], cities_mid[i][1], temp_data[2 * j], temp_data[2 * j + 1]]
-            df_format.loc[len(df_format)] = new_data
-            target_date = target_date + relativedelta(days=1)
-        dfs.append(df_format)
+            # result_code(00) : If data is appropriately collected
+            else:
+                # make a dataframe 'df_temp' that contains new data
+                df_temp = pd.DataFrame.from_dict(json_response['response']['body']['items']['item'])
+                df_temp = df_temp[
+                    ['taMin3', 'taMax3', 'taMin4', 'taMax4', 'taMin5', 'taMax5', 'taMin6', 'taMax6', 'taMin7', 'taMax7',
+                     'taMin8', 'taMax8', 'taMin9', 'taMax9', 'taMin10', 'taMax10']]
+                temp_data = df_temp.loc[0].tolist()
 
-        print(cities_mid[i][0], ': Mid forecast data collected')
+                # format 에 맞게 데이터프레임 생성
+                column_format = ['base_date', 'base_time', 'target_date', 'city', 'city_code', 'temp_min', 'temp_max']
+                df_format = pd.DataFrame(columns=column_format)
+                target_date = tmFc.date() + relativedelta(days=3)
+                for k in range(0, 8):
+                    new_data = [tmFc.date(), tmFc.time(), target_date, cities[i][0], cities[i][1], temp_data[2 * k], temp_data[2 * k + 1]]
+                    df_format.loc[len(df_format)] = new_data
+                    target_date = target_date + relativedelta(days=1)
+                dfs.append(df_format)
 
-    # 도시별 데이터를 종합한 데이터프레임
-    df_mid = pd.concat(dfs)
-    # index 초기화 (0부터 시작하도록)
-    df_mid = df_mid.reset_index(drop=True)
+                print(cities[i][0], ': forecast_mid data collected')
 
-    # Data type 변환 (datetime, float type 으로 변환)
-    df_mid['temp_min'] = df_mid['temp_min'].apply(lambda x: float(x))
-    df_mid['temp_max'] = df_mid['temp_max'].apply(lambda x: float(x))
+        # if there is an error in API, retry after 2 minutes
+        if api_error:
+            time.sleep(120)
+        else:
+            break
 
-    # base_date, base_time, target_date 에 정렬 후, 인덱스 재설정
-    df_mid = df_mid.set_index(['base_date', 'base_time', 'target_date'])
-    df_mid = df_mid.sort_index(axis=0)
-    df_mid.reset_index(level=['base_date', 'base_time', 'target_date'], inplace=True)
+    if not api_error:
+        # 도시별 데이터를 종합한 데이터프레임
+        df_mid = pd.concat(dfs)
+        df_mid = df_mid.reset_index(drop=True)
 
-    # 'base_date' and 'target_date' columns get converted to pandas._libs.tslibs.timestamps.Timestamp type
-    # convert them back to datetime.date type
-    df_mid['base_date'] = df_mid['base_date'].astype(str)
-    df_mid['base_date'] = df_mid['base_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d').date())
-    df_mid['target_date'] = df_mid['target_date'].astype(str)
-    df_mid['target_date'] = df_mid['target_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d').date())
+        # Data type 변환 (datetime, float type 으로 변환)
+        df_mid['temp_min'] = df_mid['temp_min'].apply(lambda x: float(x))
+        df_mid['temp_max'] = df_mid['temp_max'].apply(lambda x: float(x))
 
-    # return the collected dataframe
-    return df_mid
+        # base_date, base_time, target_date 에 정렬 후, 인덱스 재설정
+        df_mid = df_mid.set_index(['base_date', 'base_time', 'target_date'])
+        df_mid = df_mid.sort_index(axis=0)
+        df_mid.reset_index(level=['base_date', 'base_time', 'target_date'], inplace=True)
+
+        # combine the template dataframe and the collected data, then return it
+        df_result = df_template.combine_first(df_mid)
+        return df_result
+
+    # if error in API still happens after 5 trials, return df_template (dataframe without data)
+    else:
+        return df_template
 
 
 # csv file to MySQL
@@ -201,21 +250,24 @@ def updateMySQL():
     # update MySQL data
     try:
         cursor = cnx.cursor()
-        # get new dataframe
         df_mid = get_mid()
         print('\nMid forecast data:\n', df_mid)
 
-        # insert each row of df_ultra to MySQL
+        # insert each row of df_mid to MySQL
         for index, row in df_mid.iterrows():
-            # insert into table
-            query_string = 'INSERT INTO {} (base_date, base_time, target_date, city, city_code, temp_min, temp_max) ' \
-                           'VALUES (%s, %s, %s, %s, %s, %s, %s);'.format(table_name)
-            cursor.execute(query_string, row.values.tolist())
+            try:
+                # insert into table
+                query_string = 'INSERT INTO {} (base_date, base_time, target_date, city, city_code, temp_min, temp_max) ' \
+                               'VALUES (%s, %s, %s, %s, %s, %s, %s);'.format(table_name)
+                cursor.execute(query_string, row.values.tolist())
+                cnx.commit()
+                print('New data inserted into MySQL table.')
 
-            # commit : make changes persistent to the database
-            cnx.commit()
-            # print status
-            print('New data inserted into MySQL table.')
+            except mysql.connector.Error as error:
+                print('Failed to insert into MySQL table. {}'.format(error))
+
+            except:
+                print("Unexpected error:", sys.exc_info(), '\n')
 
     except mysql.connector.Error as error:
         print('Failed to insert into MySQL table. {}\n'.format(error))
@@ -245,7 +297,7 @@ def deleteMySQL():
 
         # delete the target
         cursor = cnx.cursor()
-        cursor.execute(cursor.execute("DELETE FROM {}".format(table_name)))
+        cursor.execute("DELETE FROM {} WHERE id > 150".format(table_name))
         cnx.commit()
         print('Deletion completed.')
 
@@ -270,7 +322,7 @@ def deleteMySQL():
 # main function
 def main():
     # MySQL
-    toMySQL()
+    # toMySQL()
     # updateMySQL()
     # deleteMySQL()
 
