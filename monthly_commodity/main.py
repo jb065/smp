@@ -76,7 +76,8 @@ def organize_past_data(xlsx_to_organize):
 
 def update():
     # target month of data
-    target_month = datetime.datetime.now().replace(day=1, hour=0, minute=0, microsecond=0)
+    target_month = (datetime.datetime.now().replace(day=1, hour=0, minute=0, microsecond=0) - relativedelta(months=1)).date()
+    print('Collecting data for', target_month)
 
     # 크롬 창 뜨지 않게 설정 추가
     chrome_options = Options()
@@ -116,7 +117,7 @@ def update():
     # row 1 지우기 (불필요한 row)
     new_df = new_df.drop(1, axis=0)
 
-    # 해당 달, 두바이유, 호주 석탄, 일본 LNG 값만 읽기
+    # 해당 달, 필요한 값만 읽기
     new_df = new_df[['cdate', 'COAL_AUS', 'COAL_SAFRICA', 'CRUDE_PETRO', 'CRUDE_BRENT', 'CRUDE_DUBAI', 'CRUDE_WTI', 'iNATGAS', 'NGAS_EUR', 'NGAS_US', 'NGAS_JP']]
 
     # 가장 최신 달의 데이터를 리스트 형식으로 저장
@@ -132,7 +133,7 @@ def update():
     # if the month of the new data is inappropriate, return empty data
     if new_month != target_month:
         print('Wrong month for new data. Update cancelled.')
-        return [target_month.date(), None, None, None, None, None, None, None, None]
+        return [target_month.date(), None, None, None, None, None, None, None, None, None, None]
     else:
         return new_data
 
@@ -241,8 +242,19 @@ def updateMySQL():
         # insert into table
         query_string = 'INSERT INTO {} (cdate, coal_aus, coal_safrica, crude_petro, crude_brent, crude_dubai, ' \
                        'crude_wti, ngas_index, ngas_eur, ngas_us, ngas_jp) ' \
-                       'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
-        cursor.execute(query_string, new_data)
+                       'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ' \
+                       'ON DUPLICATE KEY UPDATE ' \
+                       'coal_aus = IF(coal_aus IS NULL, %s, coal_aus), ' \
+                       'coal_safrica = IF(coal_safrica IS NULL, %s, coal_safrica), ' \
+                       'crude_petro = IF(crude_petro IS NULL, %s, crude_petro), ' \
+                       'crude_brent = IF(crude_brent IS NULL, %s, crude_brent), ' \
+                       'crude_dubai = IF(crude_dubai IS NULL, %s, crude_dubai), ' \
+                       'crude_wti = IF(crude_wti IS NULL, %s, crude_wti), ' \
+                       'ngas_index = IF(ngas_index IS NULL, %s, ngas_index), ' \
+                       'ngas_eur = IF(ngas_eur IS NULL, %s, ngas_eur), ' \
+                       'ngas_us = IF(ngas_us IS NULL, %s, ngas_us), ' \
+                       'ngas_jp = IF(ngas_jp IS NULL, %s, ngas_jp);'.format(table_name)
+        cursor.execute(query_string, new_data + new_data[1:11])
         cnx.commit()
         print('New data inserted into MySQL table.\n')
 
@@ -274,7 +286,7 @@ def deleteMySQL():
 
         # delete the target
         cursor = cnx.cursor()
-        cursor.execute(cursor.execute("DELETE FROM {} WHERE id > 78".format(table_name)))
+        cursor.execute("DELETE FROM {} WHERE id > 78".format(table_name))
         cnx.commit()
         print('Deletion completed.\n')
 
@@ -308,7 +320,7 @@ def main():
     # MySQL
     # toMySQL()
     # updateMySQL()
-    # deleteMySQL()
+    deleteMySQL()
 
 
 if __name__ == '__main__':

@@ -199,21 +199,19 @@ def update():
 
         # error worth retry
         elif result_code in retry_error_code:
-            print('API Error Code {}\n'.format(result_code))
-
             # 5th trial : return empty data
             if j == 4:
-                print('Trial {} : Failed. Error during calling API. Returning empty data'.format(j + 1), '\n')
+                print('Trial {} : Failed. API Error Code {}. Returning empty data'.format(j + 1, result_code), '\n')
                 return [target_time.date(), target_time.time(), None, None, None, None, None, None, None]
 
             # 1-4th trial : retry after 30 sec
             else:
-                print('Trial {} : Failed. Error during calling API. Automatically retry in 30 sec'.format(j + 1), '\n')
+                print('Trial {} : Failed. API Error Code {}. Automatically retry in 30 sec'.format(j + 1, result_code), '\n')
                 time.sleep(30)
 
         # error not worth retry : return empty dataframe
         else:
-            print('Critical API Error. Cancel calling API .\n')
+            print('Trial {} : Critical API Error {}. Cancel calling API .\n'.format(j + 1, result_code))
             return [target_time.date(), target_time.time(), None, None, None, None, None, None, None]
 
 
@@ -324,8 +322,16 @@ def updateMySQL():
         else:
             query_string = 'INSERT INTO {} (cdate, ctime, supply_capacity, demand, peak_demand, reserve, ' \
                            'reserve_margin, operational_reserve, operational_reserve_ratio) VALUES ' \
-                           '(%s, %s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
-            cursor.execute(query_string, new_data)
+                           '(%s, %s, %s, %s, %s, %s, %s, %s, %s)' \
+                           'ON DUPLICATE KEY UPDATE ' \
+                           'supply_capacity = IF(supply_capacity IS NULL, %s, supply_capacity), ' \
+                           'demand = IF(demand IS NULL, %s, demand), ' \
+                           'peak_demand = IF(peak_demand IS NULL, %s, peak_demand), ' \
+                           'reserve = IF(reserve IS NULL, %s, reserve), ' \
+                           'reserve_margin = IF(reserve_margin IS NULL, %s, reserve_margin), ' \
+                           'operational_reserve = IF(operational_reserve IS NULL, %s, operational_reserve), ' \
+                           'operational_reserve_ratio = IF(operational_reserve_ratio IS NULL, %s, operational_reserve_ratio);'.format(table_name)
+            cursor.execute(query_string, new_data + new_data[2:9])
             cnx.commit()
             print('New data inserted into MySQL table.\n')
 
@@ -390,10 +396,8 @@ def main():
 
     # MySQL
     # toMySQL()
-    # updateMySQL()
+    updateMySQL()
     # deleteMySQL()
-
-    print(update())
 
 
 if __name__ == '__main__':

@@ -315,6 +315,7 @@ def get_template(base_date):
     df['ctime'] = ctime_column
     df['city'] = city_name * 24
     df['city_code'] = city_code * 24
+    df['temp'] = None
 
     return df
 
@@ -365,6 +366,7 @@ def update():
                     df_temp.columns = 'time', 'city_code', 'temp'
                     df_temp.insert(1, 'city', cities[i][0])
                     dfs.append(df_temp)
+                    print(cities[i][0], ': hourly_temp collected')
 
             # error worth retry : retry after 2 min
             elif result_code in retry_error_code:
@@ -410,11 +412,12 @@ def update():
     df_new = df_new.drop('time', axis=1)
     df_new.insert(0, 'ctime', time_column)
     df_new.insert(0, 'cdate', date_column)
-
-    # insert 'id' column
     df_new.reset_index(drop=True, inplace=True)
 
-    return df_new
+    # combine the template dataframe and the collected data, convert nan to None, then return it
+    df_result = df_template.combine_first(df_new)
+    df_result = df_result.where(pd.notnull(df_result), None)
+    return df_result
 
 
 # csv file to MySQL
@@ -515,9 +518,12 @@ def updateMySQL():
         for index, row in new_data.iterrows():
             try:
                 # insert into table
+                row_data = row.values.tolist()
                 query_string = 'INSERT INTO {} (cdate, ctime, city, city_code, temp) ' \
-                               'VALUES (%s, %s, %s, %s, %s);'.format(table_name)
-                cursor.execute(query_string, row.values.tolist())
+                               'VALUES (%s, %s, %s, %s, %s) ' \
+                               'ON DUPLICATE KEY UPDATE ' \
+                               'temp = IF(temp IS NULL, %s, temp);'.format(table_name)
+                cursor.execute(query_string, row_data + row_data[4:5])
                 cnx.commit()
                 print('New data inserted into MySQL table.')
 
@@ -589,8 +595,6 @@ def main():
     # toMySQL()
     # updateMySQL()
     # deleteMySQL()
-
-    print(update())
 
 
 if __name__ == '__main__':

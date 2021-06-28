@@ -227,7 +227,7 @@ def update():
         WebDriverWait(driver, 10).until(element_present)
 
     except TimeoutException:
-        print('Loading took too much time. Update cancelled.')
+        print('Land : Loading took too much time. Returning empty data.')
         driver.quit()
         return
 
@@ -235,7 +235,7 @@ def update():
 
     # 새로운 날짜의 데이터를 저장할 리스트 [cdate, land_wa, jeju_wa]
     new_data = []
-    # list of weighted average values [land_wa, jeju_wa]
+    # list of weighted average values [land_wa, jeju_wa] -> will be used when converting the values to float type
     value_list = []
 
     # 'date' 값 추가
@@ -256,7 +256,7 @@ def update():
         WebDriverWait(driver, 10).until(element_present)
 
     except TimeoutException:
-        print('Loading took too much time')
+        print('Jeju : Loading took too much time. Returning empty data')
         driver.quit()
         return
 
@@ -370,8 +370,11 @@ def updateMySQL():
         print('new_data :', new_data, '\n')
 
         # insert the new data to the table
-        query_string = 'INSERT INTO {} (cdate, land_wa, jeju_wa) VALUES (%s, %s, %s);'.format(table_name)
-        cursor.execute(query_string, new_data)
+        query_string = 'INSERT INTO {} (cdate, land_wa, jeju_wa) VALUES (%s, %s, %s) ' \
+                       'ON DUPLICATE KEY UPDATE ' \
+                       'land_wa = IF(land_wa IS NULL, %s, land_wa), ' \
+                       'jeju_wa = IF(jeju_wa IS NULL, %s, jeju_wa);'.format(table_name)
+        cursor.execute(query_string, new_data + new_data[1:3])
         cnx.commit()
         print('New data inserted into MySQL table.\n')
 
@@ -435,10 +438,8 @@ def main():
 
     # MySQL
     # toMySQL()
-    # updateMySQL()
+    updateMySQL()
     # deleteMySQL()
-
-    # testMySQL()
 
 
 if __name__ == '__main__':

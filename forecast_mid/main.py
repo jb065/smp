@@ -44,6 +44,8 @@ def get_template(base_time):
     df['target_date'] = [t.date() for t in target_column]
     df['city'] = city_name * num_forecast
     df['city_code'] = city_code * num_forecast
+    df['temp_min'] = None
+    df['temp_max'] = None
 
     return df
 
@@ -115,7 +117,7 @@ def get_mid():
 
             # error not worth retry : return empty dataframe
             else:
-                print(cities[i][0], ': Critical API Error. Cancel calling API .\n')
+                print(cities[i][0], ': Error Code {}. Critical API Error. Cancel calling API .\n'.format(result_code))
                 return df_template
 
         # if there is an error in API, retry after 2 minutes
@@ -139,8 +141,9 @@ def get_mid():
         df_mid = df_mid.sort_index(axis=0)
         df_mid.reset_index(level=['base_date', 'base_time', 'target_date'], inplace=True)
 
-        # combine the template dataframe and the collected data, then return it
+        # combine the template dataframe and the collected data, convert nan to None, then return it
         df_result = df_template.combine_first(df_mid)
+        df_result = df_result.where(pd.notnull(df_result), None)
         return df_result
 
     # if error in API still happens after 5 trials, return df_template (dataframe without data)
@@ -249,9 +252,13 @@ def updateMySQL():
         for index, row in df_mid.iterrows():
             try:
                 # insert into table
+                row_data = row.values.tolist()
                 query_string = 'INSERT INTO {} (base_date, base_time, target_date, city, city_code, temp_min, temp_max) ' \
-                               'VALUES (%s, %s, %s, %s, %s, %s, %s);'.format(table_name)
-                cursor.execute(query_string, row.values.tolist())
+                               'VALUES (%s, %s, %s, %s, %s, %s, %s) ' \
+                               'ON DUPLICATE KEY UPDATE ' \
+                               'temp_min = IF(temp_min IS NULL, %s, temp_min), ' \
+                               'temp_max = IF(temp_max IS NULL, %s, temp_max);'.format(table_name)
+                cursor.execute(query_string, row_data + row_data[5:7])
                 cnx.commit()
                 print('New data inserted into MySQL table.')
 
@@ -289,7 +296,7 @@ def deleteMySQL():
 
         # delete the target
         cursor = cnx.cursor()
-        cursor.execute("DELETE FROM {} WHERE id > 150".format(table_name))
+        cursor.execute("DELETE FROM {} WHERE id > 544".format(table_name))
         cnx.commit()
         print('Deletion completed.')
 
@@ -317,6 +324,7 @@ def main():
     # toMySQL()
     # updateMySQL()
     # deleteMySQL()
+
 
 
 if __name__ == '__main__':

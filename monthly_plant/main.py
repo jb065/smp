@@ -66,7 +66,8 @@ def organize_past_data(csv_to_organize):
 # 새로운 데이터 업데이트
 def update():
     # target month of data
-    target_month = datetime.datetime.now().replace(day=1, hour=0, minute=0, microsecond=0)
+    target_month = (datetime.datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)).date()
+    print('Collecting data for', target_month)
 
     # 크롬 창 뜨지 않게 설정 추가
     chrome_options = Options()
@@ -88,21 +89,21 @@ def update():
     except TimeoutException:
         print('Loading took too much time. Returning empty data.')
         driver.quit()
-        return [target_month.date(), None, None, None, None, None, None, None, None]
+        return [target_month, None, None, None, None, None, None, None, None]
 
     soup = BeautifulSoup(driver.page_source, 'html.parser')
 
     # check if the month of the new data is appropriate
     new_month = datetime.datetime.strptime(soup.select_one('#grid1 > div > div > '
                                                            'div.rMateH5__DataGridBaseContentHolder > span:nth-child('
-                                                           '9)').text, '%Y/%m')
+                                                           '9)').text, '%Y/%m').date()
 
     if new_month != target_month:
         print('Wrong month for new data. Update cancelled.')
-        return [target_month.date(), None, None, None, None, None, None, None, None]
+        return [target_month, None, None, None, None, None, None, None, None]
     else:
         # collect new data (month, nuclear, bituminous, anthracite, oil, lng, amniotic, others, total)
-        new_data = [new_month.date(),
+        new_data = [new_month,
                     float(soup.select_one('#rMateH5__Content201 > span:nth-child(66)').text.replace(',', '')),
                     float(soup.select_one('#rMateH5__Content201 > span:nth-child(67)').text.replace(',', '')),
                     float(soup.select_one('#rMateH5__Content201 > span:nth-child(68)').text.replace(',', '')),
@@ -214,8 +215,17 @@ def updateMySQL():
 
         # insert the new data to the table
         query_string = 'INSERT INTO {} (cdate, nuclear, bituminous, anthracite, oil, lng, amniotic, others, ' \
-                       'total) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
-        cursor.execute(query_string, new_data)
+                       'total) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) ' \
+                       'ON DUPLICATE KEY UPDATE ' \
+                       'nuclear = IF(nuclear IS NULL, %s, nuclear), ' \
+                       'bituminous = IF(bituminous IS NULL, %s, bituminous), ' \
+                       'anthracite = IF(anthracite IS NULL, %s, anthracite), ' \
+                       'oil = IF(oil IS NULL, %s, oil), ' \
+                       'lng = IF(lng IS NULL, %s, lng), ' \
+                       'amniotic = IF(amniotic IS NULL, %s, amniotic), ' \
+                       'others = IF(others IS NULL, %s, others), ' \
+                       'total = IF(total IS NULL, %s, total);'.format(table_name)
+        cursor.execute(query_string, new_data + new_data[1:9])
         cnx.commit()
         print('New data inserted into MySQL table.\n')
 

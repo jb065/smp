@@ -153,6 +153,8 @@ def get_template(target_date):
 
     df['cdate'] = [target_date] * 24
     df['ctime'] = ctime_column
+    df['land_smp'] = None
+    df['jeju_smp'] = None
 
     return df
 
@@ -193,7 +195,7 @@ def update():
                 base_date = datetime.datetime.strptime(tree.find('.//tradeDay').text, '%Y%m%d').date()
 
                 if base_date != target_date:
-                    print('Wrong month for new data. Update cancelled.')
+                    print('Trial {} : Wrong month for new data. Returning empty data.'.format(j+1))
                     return df_template
                 else:
                     # 새로운 데이터 수집
@@ -208,18 +210,17 @@ def update():
 
             # error worth retry : retry after 2 min
             elif result_code in retry_error_code:
-                print('API Error Code {}\n'.format(result_code))
                 api_error = True
                 break
 
             # error not worth retry : return empty dataframe
             else:
-                print('Critical API Error. Cancel calling API .\n')
+                print('Trial {} : Critical API Error {}. Returning empty data.\n'.format(j + 1, result_code))
                 return df_template
 
         # if there is an error in API, retry after 2 minutes
         if api_error:
-            print('Trial {} : Failed. Error during calling API. Automatically retry in 2 min'.format(j + 1), '\n')
+            print('Trial {} : Failed. API Error Code {}. Automatically retry in 2 min'.format(j + 1, result_code), '\n')
             time.sleep(120)
         else:
             break
@@ -233,6 +234,7 @@ def update():
 
     # insert the collected data to the template dataframe and return it
     df_result = df_template.combine_first(df_update)
+    df_result = df_result.where(pd.notnull(df_result), None)
     return df_result
 
 
@@ -333,9 +335,13 @@ def updateMySQL():
         for index, row in new_data.iterrows():
             try:
                 # insert into table
+                row_data = row.values.tolist()
                 query_string = 'INSERT INTO {} (cdate, ctime, land_smp, jeju_smp) ' \
-                               'VALUES (%s, %s, %s, %s);'.format(table_name)
-                cursor.execute(query_string, row.values.tolist())
+                               'VALUES (%s, %s, %s, %s) ' \
+                               'ON DUPLICATE KEY UPDATE ' \
+                               'land_smp = IF(land_smp IS NULL, %s, land_smp), ' \
+                               'jeju_smp = IF(jeju_smp IS NULL, %s, jeju_smp);'.format(table_name)
+                cursor.execute(query_string, row_data + row_data[2:4])
                 cnx.commit()
                 print('New data inserted into MySQL table.')
 
@@ -373,9 +379,9 @@ def deleteMySQL():
 
         # delete the target
         cursor = cnx.cursor()
-        cursor.execute(cursor.execute("DELETE FROM {} WHERE id > 56640".format(table_name)))
+        cursor.execute(cursor.execute("DELETE FROM {} WHERE id > 56664".format(table_name)))
         cnx.commit()
-        print('Deletion completed.\n')
+        print('Deletion completed.')
 
     except mysql.connector.Error as error:
         if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:

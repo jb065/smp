@@ -46,6 +46,7 @@ def get_template(base_time):
     df['city'] = city_name * num_forecast
     df['city_x'] = city_x * num_forecast
     df['city_y'] = city_y * num_forecast
+    df['forecast_temp'] = None
 
     return df
 
@@ -61,7 +62,7 @@ def get_village():
     elif now_.hour % 3 == 2 and now_.minute <= 5:
         base_time = now_.replace(hour=now_.hour - 3, minute=0, second=0, microsecond=0)
     else:
-        base_time = now_.replace(hour=now_.hour - (3 - now_.hour % 3), minute=0, second=0, microsecond=0)
+        base_time = now_.replace(hour=now_.hour - (now_.hour % 3) - 1, minute=0, second=0, microsecond=0)
 
     df_template = get_template(base_time)
     retry_error_code = ['01', '02', '03', '04', '05']
@@ -126,7 +127,7 @@ def get_village():
 
             # error not worth retry : return empty dataframe
             else:
-                print(cities[i][0], ': Critical API Error. Cancel calling API .\n')
+                print(cities[i][0], ': Error Code {}. Critical API Error. Cancel calling API.\n'.format(result_code))
                 return df_template
 
         # if there is an error in API, retry after 2 minutes
@@ -148,6 +149,7 @@ def get_village():
 
         # combine the template dataframe and the collected data, then return it
         df_result = df_template.combine_first(df_village)
+        df_result = df_result.where(pd.notnull(df_result), None)
         return df_result
 
     # if error in API still happens after 5 trials, return df_template (dataframe without data)
@@ -262,9 +264,12 @@ def updateMySQL():
             for index, row in new_data.iterrows():
                 try:
                     # insert into table
+                    row_data = row.values.tolist()
                     query_string = 'INSERT INTO {} (base_date, base_time, target_date, target_time, city, city_x, city_y, ' \
-                                   'forecast_temp) VALUES (%s, %s, %s, %s, %s, %s, %s, %s);'.format(table_name)
-                    cursor.execute(query_string, row.values.tolist())
+                                   'forecast_temp) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ' \
+                                   'ON DUPLICATE KEY UPDATE ' \
+                                   'forecast_temp = IF(forecast_temp IS NULL, %s, forecast_temp);'.format(table_name)
+                    cursor.execute(query_string, row_data + row_data[7:8])
                     cnx.commit()
                     print('New data inserted into MySQL table.')
 
@@ -302,7 +307,7 @@ def deleteMySQL():
 
         # delete the target
         cursor = cnx.cursor()
-        cursor.execute("DELETE FROM {} WHERE id > 1485".format(table_name))
+        cursor.execute("DELETE FROM {} WHERE id > 2398;".format(table_name))
         cnx.commit()
         print('Deletion completed.')
 
