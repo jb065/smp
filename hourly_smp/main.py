@@ -11,6 +11,7 @@ import mysql.connector
 from mysql.connector import errorcode
 from sqlalchemy import create_engine
 import sys
+import time
 
 
 # 과거 SMP 데이터 파일(csv) 정리 (http://epsis.kpx.or.kr/epsisnew/selectEkmaSmpShdGrid.do?menuId=050202)
@@ -143,6 +144,19 @@ def merge_land_jeju(csv_land, csv_jeju, csv_merged):
     print('Merging completed to file', csv_merged)
 
 
+# returns the template of dataframe
+def get_template(target_date):
+    df = pd.DataFrame(columns=['cdate', 'ctime', 'land_smp', 'jeju_smp'])
+    ctime_column = []
+    for i in range(0, 24):
+        ctime_column.append(datetime.time((i + 1) % 24, 0, 0))
+
+    df['cdate'] = [target_date] * 24
+    df['ctime'] = ctime_column
+
+    return df
+
+
 # 새로운 데이터 업데이트 후 return the dataframe
 # 한국전력거래소_계통한계가격조회 (https://www.data.go.kr/iim/api/selectAPIAcountView.do)
 def update():
@@ -151,28 +165,64 @@ def update():
     key = 'mhuJYMs8aVw+yxSF4sKzam/E0FlKQ0smUP7wZzcOp25OxpdG9L1lwA4JJuZu8Tlz6Dtzqk++vWDC5p0h56mtVA=='
 
     df_update = pd.DataFrame(columns=['cdate', 'ctime', 'land_smp', 'jeju_smp'])
+    target_date = datetime.datetime.now().date()
+    df_template = get_template(target_date)
+    retry_error_code = ['01', '02', '03', '04', '05']
 
-    for i in range(0, 2):
-        if i == 0:
-            areaCd = 1
+    # try collecting data from API for 5 times
+    for j in range(0, 5):
+        print('Trial {} : Getting hourly_smp of'.format(j+1), target_date, '\n')
+        api_error = False
+
+        for i in range(0, 2):
+            if i == 0:
+                areaCd = 1
+            else:
+                areaCd = 9
+
+            queryParams = '?' + urlencode({quote_plus('ServiceKey'): key, quote_plus('areaCd'): areaCd})
+
+            # API 를 통해 데이터 불러와 ElementTree 로 파싱
+            response = requests.get(url + queryParams)
+            tree = ET.ElementTree(ET.fromstring(response.text))
+            result_code = tree.find('.//resultCode').text
+
+            # result_code(00) : If data is appropriately collected
+            if result_code == '00':
+                # check if the date of the new data is appropriate
+                base_date = datetime.datetime.strptime(tree.find('.//tradeDay').text, '%Y%m%d').date()
+
+                if base_date != target_date:
+                    print('Wrong month for new data. Update cancelled.')
+                    return df_template
+                else:
+                    # 새로운 데이터 수집
+                    new_data = []
+                    for item in tree.findall('.//smp'):
+                        new_data.append(item.text)
+
+                    if i == 0:
+                        df_update.loc[:, 'land_smp'] = new_data
+                    else:
+                        df_update.loc[:, 'jeju_smp'] = new_data
+
+            # error worth retry : retry after 2 min
+            elif result_code in retry_error_code:
+                print('API Error Code {}\n'.format(result_code))
+                api_error = True
+                break
+
+            # error not worth retry : return empty dataframe
+            else:
+                print('Critical API Error. Cancel calling API .\n')
+                return df_template
+
+        # if there is an error in API, retry after 2 minutes
+        if api_error:
+            print('Trial {} : Failed. Error during calling API. Automatically retry in 2 min'.format(j + 1), '\n')
+            time.sleep(120)
         else:
-            areaCd = 9
-
-        queryParams = '?' + urlencode({quote_plus('ServiceKey'): key, quote_plus('areaCd'): areaCd})
-
-        # API 를 통해 데이터 불러와 ElementTree 로 파싱
-        response = requests.get(url + queryParams)
-        tree = ET.ElementTree(ET.fromstring(response.text))
-
-        # 새로운 데이터 수집
-        new_data = []
-        for item in tree.findall('.//smp'):
-            new_data.append(item.text)
-
-        if i == 0:
-            df_update.loc[:, 'land_smp'] = new_data
-        else:
-            df_update.loc[:, 'jeju_smp'] = new_data
+            break
 
     # cdate, ctime column 설정
     ctime_column = []
@@ -181,7 +231,9 @@ def update():
     df_update.loc[:, 'ctime'] = ctime_column
     df_update.loc[:, 'cdate'] = datetime.datetime.strptime(tree.find('.//tradeDay').text, '%Y%m%d').date()
 
-    return df_update
+    # insert the collected data to the template dataframe and return it
+    df_result = df_template.combine_first(df_update)
+    return df_result
 
 
 # csv file to MySQL

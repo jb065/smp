@@ -65,6 +65,9 @@ def organize_past_data(csv_to_organize):
 
 # 새로운 데이터 업데이트
 def update():
+    # target month of data
+    target_month = datetime.datetime.now().replace(day=1, hour=0, minute=0, microsecond=0)
+
     # 크롬 창 뜨지 않게 설정 추가
     chrome_options = Options()
     chrome_options.add_argument("--headless")
@@ -74,45 +77,41 @@ def update():
     url = 'http://epsis.kpx.or.kr/epsisnew/selectEkmaGcpBftGrid.do?menuId=050301'
     driver.get(url)
 
-    # 자원별 발전량 데이터가 조회될 때 까지 최대 3초 대기
-    # CSS_SELECTOR 중에 해당값이 있을 때 까지 최대 3초 대기
+    # 자원별 발전량 데이터가 조회될 때 까지 최대 10초 대기
+    # CSS_SELECTOR 중에 해당값이 있을 때 까지 최대 10초 대기
     try:
         element_present = EC.presence_of_element_located((By.CSS_SELECTOR, '#grid1 > div > div > '
                                                                            'div.rMateH5__DataGridBaseContentHolder > '
                                                                            'span:nth-child(9)'))
-        WebDriverWait(driver, 3).until(element_present)
+        WebDriverWait(driver, 10).until(element_present)
 
     except TimeoutException:
-        print('Loading took too much time')
+        print('Loading took too much time. Returning empty data.')
         driver.quit()
-        return
+        return [target_month.date(), None, None, None, None, None, None, None, None]
 
     soup = BeautifulSoup(driver.page_source, 'html.parser')
 
-    # 업데이트할 데이터의 날짜가 과거 데이터 다음달이 아닌 경우, 업데이트 취소
+    # check if the month of the new data is appropriate
     new_month = datetime.datetime.strptime(soup.select_one('#grid1 > div > div > '
                                                            'div.rMateH5__DataGridBaseContentHolder > span:nth-child('
                                                            '9)').text, '%Y/%m')
-    """
-    latest_month = datetime.datetime.strptime(df_past.loc[0].at['cdate'], '%Y-%m-%d')
-    if new_month != latest_month + relativedelta(months=1):
+
+    if new_month != target_month:
         print('Wrong month for new data. Update cancelled.')
-        return
-    """
-
-    # collect new data (month, nuclear, bituminous, anthracite, oil, lng, amniotic, others, total)
-    new_data = [new_month.date(),
-                float(soup.select_one('#rMateH5__Content201 > span:nth-child(66)').text.replace(',', '')),
-                float(soup.select_one('#rMateH5__Content201 > span:nth-child(67)').text.replace(',', '')),
-                float(soup.select_one('#rMateH5__Content201 > span:nth-child(68)').text.replace(',', '')),
-                float(soup.select_one('#rMateH5__Content201 > span:nth-child(69)').text.replace(',', '')),
-                float(soup.select_one('#rMateH5__Content201 > span:nth-child(70)').text.replace(',', '')),
-                float(soup.select_one('#rMateH5__Content201 > span:nth-child(71)').text.replace(',', '')),
-                float(soup.select_one('#rMateH5__Content201 > span:nth-child(72)').text.replace(',', '')),
-                float(soup.select_one('#rMateH5__Content201 > span:nth-child(73)').text.replace(',', ''))]
-    # 데이터가 10,000 과 같은 str 형식 -> ','를 없애고 float type 으로 전환
-
-    return new_data
+        return [target_month.date(), None, None, None, None, None, None, None, None]
+    else:
+        # collect new data (month, nuclear, bituminous, anthracite, oil, lng, amniotic, others, total)
+        new_data = [new_month.date(),
+                    float(soup.select_one('#rMateH5__Content201 > span:nth-child(66)').text.replace(',', '')),
+                    float(soup.select_one('#rMateH5__Content201 > span:nth-child(67)').text.replace(',', '')),
+                    float(soup.select_one('#rMateH5__Content201 > span:nth-child(68)').text.replace(',', '')),
+                    float(soup.select_one('#rMateH5__Content201 > span:nth-child(69)').text.replace(',', '')),
+                    float(soup.select_one('#rMateH5__Content201 > span:nth-child(70)').text.replace(',', '')),
+                    float(soup.select_one('#rMateH5__Content201 > span:nth-child(71)').text.replace(',', '')),
+                    float(soup.select_one('#rMateH5__Content201 > span:nth-child(72)').text.replace(',', '')),
+                    float(soup.select_one('#rMateH5__Content201 > span:nth-child(73)').text.replace(',', ''))]
+        return new_data
 
 
 # csv file to MySQL
@@ -248,7 +247,7 @@ def deleteMySQL():
 
         # delete the target
         cursor = cnx.cursor()
-        cursor.execute(cursor.execute("DELETE FROM {} WHERE id = 77".format(table_name)))
+        cursor.execute(cursor.execute("DELETE FROM {} WHERE id > 77".format(table_name)))
         cnx.commit()
         print('Deletion completed.\n')
 
@@ -277,7 +276,7 @@ def main():
     # update('monthly_plant_formatted.csv')
 
     # MySQL
-    toMySQL()
+    # toMySQL()
     # updateMySQL()
     # deleteMySQL()
 

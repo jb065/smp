@@ -11,6 +11,7 @@ import mysql.connector
 from mysql.connector import errorcode
 from sqlalchemy import create_engine
 import sys
+import time
 
 
 # 과거 데이터 종합 (사이트에서 받은 파일 그대로 사용)
@@ -160,22 +161,60 @@ def fix_wrong_time(csv_to_read, csv_to_save):
 def update():
     url = 'https://openapi.kpx.or.kr/openapi/sukub5mMaxDatetime/getSukub5mMaxDatetime'
     key = 'mhuJYMs8aVw+yxSF4sKzam/E0FlKQ0smUP7wZzcOp25OxpdG9L1lwA4JJuZu8Tlz6Dtzqk++vWDC5p0h56mtVA=='
-
-    # land_smp (areaCd = 1)
     queryParams = '?' + urlencode({quote_plus('ServiceKey'): key})
 
     # API 를 통해 데이터 불러와 ElementTree 로 파싱
     response = requests.get(url + queryParams)
     tree = ET.ElementTree(ET.fromstring(response.text))
+    retry_error_code = ['01', '02', '03', '04', '05']
+    target_time = datetime.datetime.now().replace(minute=0, second=0, microsecond=0)
 
-    # collect new data and save it as a list
-    get_time = datetime.datetime.strptime(tree.find('.//baseDatetime').text, '%Y%m%d%H%M%S')
-    new_data = [get_time.date(), get_time.time(), float(tree.find('.//suppAbility').text),
-                float(tree.find('.//currPwrTot').text), float(tree.find('.//forecastLoad').text),
-                float(tree.find('.//suppReservePwr').text), float(tree.find('.//suppReserveRate').text),
-                float(tree.find('.//operReservePwr').text), float(tree.find('.//operReserveRate').text)]
+    # try collecting data from API for 5 times
+    for j in range(0, 5):
+        print('Trial {} : Getting forecast_ultra based on'.format(j+1), target_time,)
+        api_error = False
+        result_code = tree.find('.//resultCode').text
 
-    return new_data
+        # result_code(00) : If data is appropriately collected
+        if result_code == '00':
+            get_time = datetime.datetime.strptime(tree.find('.//baseDatetime').text, '%Y%m%d%H%M%S')
+
+            # collect data if the basetime is appropriate
+            if get_time == target_time:
+                new_data = [get_time.date(), get_time.time(), float(tree.find('.//suppAbility').text),
+                            float(tree.find('.//currPwrTot').text), float(tree.find('.//forecastLoad').text),
+                            float(tree.find('.//suppReservePwr').text), float(tree.find('.//suppReserveRate').text),
+                            float(tree.find('.//operReservePwr').text), float(tree.find('.//operReserveRate').text)]
+                return new_data
+            else:
+                # 5th trial : return empty data
+                if j == 4:
+                    print('Trial {} : Failed. Inappropriate base time. Returning empty data'.format(j + 1), '\n')
+                    return [target_time.date(), target_time.time(), None, None, None, None, None, None, None]
+
+                # 1-4th trial : retry after 30 sec
+                else:
+                    print('Trial {} : Failed. Inappropriate base time. Automatically retry in 30 sec'.format(j + 1), '\n')
+                    time.sleep(30)
+
+        # error worth retry
+        elif result_code in retry_error_code:
+            print('API Error Code {}\n'.format(result_code))
+
+            # 5th trial : return empty data
+            if j == 4:
+                print('Trial {} : Failed. Error during calling API. Returning empty data'.format(j + 1), '\n')
+                return [target_time.date(), target_time.time(), None, None, None, None, None, None, None]
+
+            # 1-4th trial : retry after 30 sec
+            else:
+                print('Trial {} : Failed. Error during calling API. Automatically retry in 30 sec'.format(j + 1), '\n')
+                time.sleep(30)
+
+        # error not worth retry : return empty dataframe
+        else:
+            print('Critical API Error. Cancel calling API .\n')
+            return [target_time.date(), target_time.time(), None, None, None, None, None, None, None]
 
 
 # csv file to MySQL
@@ -350,9 +389,11 @@ def main():
     # update('hourly_powersupply.csv')
 
     # MySQL
-    toMySQL()
+    # toMySQL()
     # updateMySQL()
     # deleteMySQL()
+
+    print(update())
 
 
 if __name__ == '__main__':

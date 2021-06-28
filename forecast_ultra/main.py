@@ -62,6 +62,7 @@ def get_ultra():
         base_time = now_.replace(minute=30, second=0, microsecond=0)
 
     df_template = get_template(base_time)
+    retry_error_code = ['01', '02', '03', '04', '05']
 
     # try collecting data from API for 5 times
     for j in range(0, 5):
@@ -88,19 +89,8 @@ def get_ultra():
             json_response = response.json()
             result_code = json_response['response']['header']['resultCode']
 
-            # result_code(03) : No data provided by API. Retry after 2 min
-            if result_code == '03':
-                print(cities[i][0], ': Error in calling API (No data)\n')
-                api_error = True
-                break
-
-            # result_code(99) : If base_time is set to time that is past more than a day. Return dataframe without data
-            elif result_code == '99':
-                print(cities[i][0], ': Error in calling API (API provides data for past 1 day)\n')
-                return df_template
-
             # result_code(00) : If data is appropriately collected
-            else:
+            if result_code == '00':
                 # make a dataframe 'df_temp' that contains new data
                 df_temp = pd.DataFrame.from_dict(json_response['response']['body']['items']['item'])
                 df_temp = df_temp[df_temp['category'] == 'T1H'].drop('category', axis=1)
@@ -109,13 +99,16 @@ def get_ultra():
                 # set names and order of columns
                 df_temp.insert(4, 'city', cities[i][0])
                 df_temp = df_temp[['baseDate', 'baseTime', 'fcstDate', 'fcstTime', 'city', 'nx', 'ny', 'fcstValue']]
-                df_temp.columns = ['base_date', 'base_time', 'target_date', 'target_time', 'city', 'city_x', 'city_y', 'forecast_temp']
+                df_temp.columns = ['base_date', 'base_time', 'target_date', 'target_time', 'city', 'city_x', 'city_y',
+                                   'forecast_temp']
 
                 # Data type 변환 (시간값을 str 에서 datetime type 으로 변환)
-                df_temp['base_date'] = df_temp['base_date'].apply(lambda x : datetime.datetime.strptime(x, '%Y%m%d').date())
+                df_temp['base_date'] = df_temp['base_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y%m%d').date())
                 df_temp['base_time'] = df_temp['base_time'].apply(lambda x: datetime.datetime.strptime(x, '%H%M').time())
-                df_temp['target_date'] = df_temp['target_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y%m%d').date())
-                df_temp['target_time'] = df_temp['target_time'].apply(lambda x: datetime.datetime.strptime(x, '%H%M').time())
+                df_temp['target_date'] = df_temp['target_date'].apply(
+                    lambda x: datetime.datetime.strptime(x, '%Y%m%d').date())
+                df_temp['target_time'] = df_temp['target_time'].apply(
+                    lambda x: datetime.datetime.strptime(x, '%H%M').time())
                 df_temp['city_x'] = df_temp['city_x'].apply(lambda x: int(x))
                 df_temp['city_y'] = df_temp['city_y'].apply(lambda x: int(x))
                 df_temp['forecast_temp'] = df_temp['forecast_temp'].apply(lambda x: float(x))
@@ -125,8 +118,20 @@ def get_ultra():
                 print(cities[i][0], ': forecast_ultra data collected')
                 api_error = False
 
+            # error worth retry : retry after 2 min
+            elif result_code in retry_error_code:
+                print(cities[i][0], ': API Error Code {}\n'.format(result_code))
+                api_error = True
+                break
+
+            # error not worth retry : return empty dataframe
+            else:
+                print(cities[i][0], ': Critical API Error. Cancel calling API .\n')
+                return df_template
+
         # if there is an error in API, retry after 2 minutes
         if api_error:
+            print('Trial {} : Failed. Error during calling API. Automatically retry in 2 min'.format(j + 1), '\n')
             time.sleep(120)
         else:
             break
@@ -321,6 +326,8 @@ def main():
     # toMySQL()
     # updateMySQL()
     # deleteMySQL()
+
+    print(get_ultra())
 
 
 if __name__ == '__main__':

@@ -221,10 +221,10 @@ def update():
     driver.get(url)
 
     # 육지 smp 가 조회될 때 까지 최대 3초 대기
-    # CSS_SELECTOR 중에 해당값이 있을 때 까지 최대 3초 대기
+    # CSS_SELECTOR 중에 해당값이 있을 때 까지 최대 10초 대기
     try:
         element_present = EC.presence_of_element_located((By.CSS_SELECTOR, '#rMateH5__Content404 > span:nth-child(55)'))
-        WebDriverWait(driver, 5).until(element_present)
+        WebDriverWait(driver, 10).until(element_present)
 
     except TimeoutException:
         print('Loading took too much time. Update cancelled.')
@@ -250,10 +250,10 @@ def update():
     driver.find_element_by_css_selector('#selKind2').click()
     driver.find_element_by_css_selector('#pageGrid > div > div.opBox > div > span.btnArea > button:nth-child(1)').click()
 
-    # 제주 smp 가 조회될 때 까지 최대 3초 대기
+    # 제주 smp 가 조회될 때 까지 최대 10초 대기
     try:
         element_present = EC.presence_of_element_located((By.CSS_SELECTOR, '#rMateH5__Content1208 > span:nth-child(55)'))
-        WebDriverWait(driver, 5).until(element_present)
+        WebDriverWait(driver, 10).until(element_present)
 
     except TimeoutException:
         print('Loading took too much time')

@@ -11,6 +11,7 @@ import mysql.connector
 from mysql.connector import errorcode
 from sqlalchemy import create_engine
 import sys
+import time
 
 
 # 시간별 기온 - 기상청_지상(종관, ASOS) 시간자료 조회서비스(https://www.data.go.kr/data/15057210/openapi.do)
@@ -295,34 +296,93 @@ def merge():
     df_result.to_csv('hourly_temp.csv', index=False, header=True)
 
 
+# returns template of dataframe based on base_date
+def get_template(base_date):
+    df = pd.DataFrame(index=np.arange(len(cities) * 24), columns=['cdate', 'ctime', 'city', 'city_code', 'temp'])
+
+    ctime_column = []
+    for i in range(0, 24):
+        for j in range(0, len(cities)):
+            ctime_column.append(datetime.time(i, 0, 0))
+
+    city_name = []
+    city_code = []
+    for city in cities:
+        city_name.append(city[0])
+        city_code.append(city[1])
+
+    df['cdate'] = base_date
+    df['ctime'] = ctime_column
+    df['city'] = city_name * 24
+    df['city_code'] = city_code * 24
+
+    return df
+
+
 # 새로운 데이터 업데이트
 def update():
     # 새로운 데이터를 가져올 날짜 (호출하는 날의 전날)
-    date_to_update = (datetime.datetime.now() - relativedelta(days=1)).date().strftime('%Y%m%d')
+    target_date = (datetime.datetime.now() - relativedelta(days=1)).date()
+    param_date = target_date.strftime('%Y%m%d')
 
-    # 도시별 데이터프레임을 담을 리스트
-    dfs = []
+    df_template = get_template(target_date)
+    retry_error_code = ['01', '02', '03', '04', '05']
 
     # api input parameter 설정
     url = 'http://apis.data.go.kr/1360000/AsosHourlyInfoService/getWthrDataList'
     key = 'mhuJYMs8aVw+yxSF4sKzam/E0FlKQ0smUP7wZzcOp25OxpdG9L1lwA4JJuZu8Tlz6Dtzqk++vWDC5p0h56mtVA=='
 
-    for i in range(0, len(cities)):
-        queryParams = '?' + urlencode({quote_plus('ServiceKey'): key, quote_plus('pageNo'): '10',
-                                       quote_plus('numOfRows'): '100', quote_plus('dataType'): 'JSON',
-                                       quote_plus('dataCd'): 'ASOS', quote_plus('dateCd'): 'HR',
-                                       quote_plus('startDt'): date_to_update, quote_plus('startHh'): '00',
-                                       quote_plus('endDt'): date_to_update, quote_plus('endHh'): '23',
-                                       quote_plus('stnIds'): cities[i][1]})
+    # try collecting data from API for 5 times
+    for j in range(0, 5):
+        print('Trial {} : Getting hourly_temp based on'.format(j+1), target_date, '\n')
+        api_error = False
+        dfs = []
 
-        response = requests.get(url + queryParams)
-        json_response = response.json()
-        df_temp = pd.DataFrame.from_dict(json_response['response']['body']['items']['item'])
-        df_temp = df_temp[['tm', 'stnId', 'ta']]
-        df_temp.columns = 'time', 'city_code', 'temp'
-        df_temp.insert(1, 'city', cities[i][0])
+        # for every city in the list
+        for i in range(0, len(cities)):
+            queryParams = '?' + urlencode({quote_plus('ServiceKey'): key, quote_plus('pageNo'): '10',
+                                           quote_plus('numOfRows'): '100', quote_plus('dataType'): 'JSON',
+                                           quote_plus('dataCd'): 'ASOS', quote_plus('dateCd'): 'HR',
+                                           quote_plus('startDt'): param_date, quote_plus('startHh'): '00',
+                                           quote_plus('endDt'): param_date, quote_plus('endHh'): '23',
+                                           quote_plus('stnIds'): cities[i][1]})
 
-        dfs.append(df_temp)
+            response = requests.get(url + queryParams)
+            json_response = response.json()
+            result_code = json_response['response']['header']['resultCode']
+
+            # result_code(00) : If data is appropriately collected
+            if result_code == '00':
+                # check if the date of the new data is appropriate
+                base_date = datetime.datetime.strptime(json_response['response']['body']['items']['item'][0]['tm'], '%Y-%m-%d %H:%M').date()
+
+                if base_date != target_date:
+                    print('Wrong month for new data. Returning empty data.')
+                    return df_template
+                else:
+                    df_temp = pd.DataFrame.from_dict(json_response['response']['body']['items']['item'])
+                    df_temp = df_temp[['tm', 'stnId', 'ta']]
+                    df_temp.columns = 'time', 'city_code', 'temp'
+                    df_temp.insert(1, 'city', cities[i][0])
+                    dfs.append(df_temp)
+
+            # error worth retry : retry after 2 min
+            elif result_code in retry_error_code:
+                print(cities[i][0], ': API Error Code {}\n'.format(result_code))
+                api_error = True
+                break
+
+            # error not worth retry : return empty dataframe
+            else:
+                print(cities[i][0], ': Critical API Error. Returning empty data.\n')
+                return df_template
+
+        # if there is an error in API, retry after 2 minutes
+        if api_error:
+            print('Trial {} : Failed. Error during calling API. Automatically retry in 2 min'.format(j + 1), '\n')
+            time.sleep(120)
+        else:
+            break
 
     # 모든 도시의 데이터를 갖는 데이터프레임
     df_new_merged = pd.concat(dfs, axis=1, join='inner')
@@ -529,6 +589,8 @@ def main():
     # toMySQL()
     # updateMySQL()
     # deleteMySQL()
+
+    print(update())
 
 
 if __name__ == '__main__':

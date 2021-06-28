@@ -61,6 +61,7 @@ def get_mid():
         tmFc = now_.replace(hour=18, minute=0, second=0, microsecond=0)
 
     df_template = get_template(tmFc)
+    retry_error_code = ['01', '02', '03', '04', '05']
 
     # try collecting data from API for 5 times
     for j in range(0, 5):
@@ -74,16 +75,6 @@ def get_mid():
             url = 'http://apis.data.go.kr/1360000/MidFcstInfoService/getMidTa'
             key = 'mhuJYMs8aVw+yxSF4sKzam/E0FlKQ0smUP7wZzcOp25OxpdG9L1lwA4JJuZu8Tlz6Dtzqk++vWDC5p0h56mtVA=='
 
-            """
-            # 첫번째 지역일 경우, 새로운 데이터프레임 설정
-            if i == 0:
-                # 저장할 데이터프레임 columns 설정 (tmFc, regId, D+3, D+4 ... D+10)
-                cols = ['city', 'base_time']
-                for j in range(3, 11):
-                    cols.append((tmFc + datetime.timedelta(days=j)).strftime("%Y%m%d"))
-                df_result = pd.DataFrame(columns=cols)
-            """
-
             queryParams = '?' + urlencode({quote_plus('ServiceKey'): key,
                                            quote_plus('pageNo'): '1',
                                            quote_plus('numOfRows'): '999',
@@ -95,19 +86,8 @@ def get_mid():
             json_response = response.json()
             result_code = json_response['response']['header']['resultCode']
 
-            # result_code(03) : No data provided by API. Retry after 2 min
-            if result_code == '03':
-                print(cities[i][0], ': Error in calling API (No data)\n')
-                api_error = True
-                break
-
-            # result_code(99) : If base_time is set to time that is past more than a day. Return dataframe without data
-            elif result_code == '99':
-                print(cities[i][0], ': Error in calling API (API provides data for past 1 day)\n')
-                return df_template
-
             # result_code(00) : If data is appropriately collected
-            else:
+            if result_code == '00':
                 # make a dataframe 'df_temp' that contains new data
                 df_temp = pd.DataFrame.from_dict(json_response['response']['body']['items']['item'])
                 df_temp = df_temp[
@@ -127,8 +107,20 @@ def get_mid():
 
                 print(cities[i][0], ': forecast_mid data collected')
 
+            # error worth retry : retry after 2 min
+            elif result_code in retry_error_code:
+                print(cities[i][0], ': API Error Code {}\n'.format(result_code))
+                api_error = True
+                break
+
+            # error not worth retry : return empty dataframe
+            else:
+                print(cities[i][0], ': Critical API Error. Cancel calling API .\n')
+                return df_template
+
         # if there is an error in API, retry after 2 minutes
         if api_error:
+            print('Trial {} : Failed. Error during calling API. Automatically retry in 2 min'.format(j + 1), '\n')
             time.sleep(120)
         else:
             break

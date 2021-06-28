@@ -64,6 +64,7 @@ def get_village():
         base_time = now_.replace(hour=now_.hour - (3 - now_.hour % 3), minute=0, second=0, microsecond=0)
 
     df_template = get_template(base_time)
+    retry_error_code = ['01', '02', '03', '04', '05']
 
     # try collecting data from API for 5 times
     for j in range(0, 5):
@@ -91,12 +92,8 @@ def get_village():
             json_response = response.json()
             result_code = json_response['response']['header']['resultCode']
 
-            # result_code(99) : If base_time is invalid. Retry after 2 min
-            if result_code != '00':
-                print(cities[i][0], ': Error in calling API (Invalid base_time {})\n'.format(base_time))
-
             # result_code(00) : If data is appropriately collected
-            else:
+            if result_code == '00':
                 # make a dataframe 'df_temp' that contains new data
                 df_temp = pd.DataFrame.from_dict(json_response['response']['body']['items']['item'])
                 df_temp = df_temp[df_temp['category'] == 'T3H'].drop('category', axis=1)
@@ -121,9 +118,21 @@ def get_village():
                 print(cities[i][0], ': forecast_village data collected')
                 api_error = False
 
+            # error worth retry : retry after 2 min
+            elif result_code in retry_error_code:
+                print(cities[i][0], ': API Error Code {}\n'.format(result_code))
+                api_error = True
+                break
+
+            # error not worth retry : return empty dataframe
+            else:
+                print(cities[i][0], ': Critical API Error. Cancel calling API .\n')
+                return df_template
+
         # if there is an error in API, retry after 2 minutes
         if api_error:
-            time.sleep(600)
+            print('Trial {} : Failed. Error during calling API. Automatically retry in 2 min'.format(j + 1), '\n')
+            time.sleep(120)
         else:
             break
 

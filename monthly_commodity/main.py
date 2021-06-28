@@ -75,6 +75,9 @@ def organize_past_data(xlsx_to_organize):
 
 
 def update():
+    # target month of data
+    target_month = datetime.datetime.now().replace(day=1, hour=0, minute=0, microsecond=0)
+
     # 크롬 창 뜨지 않게 설정 추가
     chrome_options = Options()
     chrome_options.add_argument("--headless")
@@ -94,6 +97,7 @@ def update():
     # 업데이트된 xlsx 파일 다운로드
     target = driver.find_element_by_xpath('//*[@id="1"]/div/div/div[1]/div/div/div/div/div[1]/div[1]/div/div/table/tbody/tr[3]/td[1]/a')
     target.click()
+    print('Downloading the file...')
 
     # 파일이 다운로드 될때까지 기다리기
     while not os.path.exists('CMO-Historical-Data-Monthly.xlsx'):
@@ -122,19 +126,15 @@ def update():
     new_month = datetime.datetime.strptime(new_data[0], '%YM%m').date()
     new_data[0] = new_month
 
-    return(new_data)
-
-    """
-    # 새로운 데이터가 기존 데이터 다음 달의 데이터가 아닌 경우, 업데이트 취소
-    latest_month = datetime.datetime.strptime(df_past.loc[len(df_past.index) - 1].at['cdate'], '%Y-%m-%d').date()
-    if new_month != latest_month + relativedelta(months=1):
-        print('Wrong month for new data. Update cancelled.')
-        os.remove('CMO-Historical-Data-Monthly.xlsx')
-        return
-    """
-
-    # 다운로드한 xlsx 파일을 지우고 싶을 경우
+    # delete the downloaded xlsx file after collecting data
     os.remove('CMO-Historical-Data-Monthly.xlsx')
+
+    # if the month of the new data is inappropriate, return empty data
+    if new_month != target_month:
+        print('Wrong month for new data. Update cancelled.')
+        return [target_month.date(), None, None, None, None, None, None, None, None]
+    else:
+        return new_data
 
 
 # csv file to MySQL
