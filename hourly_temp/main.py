@@ -29,7 +29,7 @@ def get_past_data(end_month):
     # end_month : (str) 데이터를 수집하려는 마지막 달 (e.g. '202104')
 
     # for every city in the list
-    for i in range(1, len(cities)):
+    for i in range(15, len(cities)):
         city_name = cities[i][0]
         city_code = cities[i][1]
         # 작업 현황 파악을 위한 출력
@@ -586,10 +586,9 @@ def deleteMySQL():
 # main function
 def main():
     # get_past_data('202105')
-    # fix_sejong()
-    # fix_time()
-    # merge()
-    # update()
+    fix_sejong()
+    fix_time()
+    merge()
 
     # MySQL
     # toMySQL()

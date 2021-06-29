@@ -408,12 +408,8 @@ def main():
     # organize_past_smp('hourly_land_smp.csv')
     # 과거 제주 smp 데이터 정리
     # organize_past_smp('hourly_jeju_smp.csv')
-
     # 과거 데이터 (육지 & 제주) 합치기
     # merge_land_jeju('hourly_land_smp.csv', 'hourly_jeju_smp.csv', 'hourly_smp.csv')
-
-    # 새로운 데이터 업데이트
-    # update('hourly_smp.csv')
 
     # MySQL
     # toMySQL()

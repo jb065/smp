@@ -15,12 +15,37 @@ from sqlalchemy import create_engine
 import sys
 
 
-def organize_past_data(xlsx_to_organize):
-    # xlsx_to_organize : 정리할 xlsx 파일명
+def organize_past_data():
+    # 크롬 창 뜨지 않게 설정 추가
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+
+    # webdriver 설정
+    driver = webdriver.Chrome(
+        r'C:/Users/boojw/Downloads/chromedriver_win32/chromedriver.exe', options=chrome_options)
+
+    # headless 상태에서 download 가 가능하도록 설정
+    params = {'behavior': 'allow', 'downloadPath': os.getcwd()}
+    driver.execute_cdp_cmd('Page.setDownloadBehavior', params)
+
+    # 원하는 링크 접속
+    url = 'https://www.worldbank.org/en/research/commodity-markets'
+    driver.get(url)
+
+    # 업데이트된 xlsx 파일 다운로드
+    target = driver.find_element_by_xpath(
+        '//*[@id="1"]/div/div/div[1]/div/div/div/div/div[1]/div[1]/div/div/table/tbody/tr[3]/td[1]/a')
+    target.click()
+    print('Downloading the file...')
+
+    # 파일이 다운로드 될때까지 기다리기
+    while not os.path.exists('CMO-Historical-Data-Monthly.xlsx'):
+        time.sleep(1)
+    print('Download completed')
 
     # xlsx 파일을 데이터프레임으로 저장
     # skiprows : 원하지 않는 rows 제외 (상단의 제목 부분)
-    df = pd.read_excel(xlsx_to_organize, sheet_name='Monthly Prices', skiprows=[0, 1, 2, 3])
+    df = pd.read_excel('CMO-Historical-Data-Monthly.xlsx', sheet_name='Monthly Prices', skiprows=[0, 1, 2, 3])
 
     # column 으로 설정하고 싶은 row 를 리스트로 불러와 column 으로 설정
     cols = df.iloc[1].tolist()
@@ -72,6 +97,9 @@ def organize_past_data(xlsx_to_organize):
     # 완성된 데이터프레임 출력 후 csv 파일에 저장
     print(df)
     df.to_csv('monthly_commodity.csv', index=False, header=True)
+
+    # delete the downloaded xlsx file after collecting data
+    os.remove('CMO-Historical-Data-Monthly.xlsx')
 
 
 def update():
@@ -310,17 +338,13 @@ def deleteMySQL():
 
 # main function
 def main():
-    # 과거 데이터 정리
-    # xlsx 파일 다운로드 (https://www.worldbank.org/en/research/commodity-markets)
-    # organize_past_data('CMO-Historical-Data-Monthly.xlsx')
-
-    # 데이터 업데이트
-    # update('cmo_monthly_organized.csv')
+    # 과거 데이터 정리 (No need to download the file manually : https://www.worldbank.org/en/research/commodity-markets)
+    # organize_past_data()
 
     # MySQL
     # toMySQL()
     # updateMySQL()
-    deleteMySQL()
+    # deleteMySQL()
 
 
 if __name__ == '__main__':

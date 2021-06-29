@@ -389,14 +389,11 @@ def deleteMySQL():
 def main():
     # 과거 데이터 통합 및 형식 변형
     # combine_past_data('hourly_powersupply.csv')
-    # fix_wrong_time('hourly_powersupply.csv', 'hourly_powersupply_fixed.csv')
-
-    # 새로운 데이터 업데이트
-    # update('hourly_powersupply.csv')
+    # fix_wrong_time('hourly_powersupply.csv', 'hourly_powersupply.csv')
 
     # MySQL
     # toMySQL()
-    updateMySQL()
+    # updateMySQL()
     # deleteMySQL()
 
 

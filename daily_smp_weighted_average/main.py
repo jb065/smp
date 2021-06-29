@@ -88,7 +88,7 @@ def organize_past_data(csv_to_organize, location):
     print(df_wa)
 
     # 다시 csv 파일에 저장
-    df_wa.to_csv('daily_{}_smp_weighted_average_formatted.csv'.format(location), index=False, header=True)
+    df_wa.to_csv(csv_to_organize, index=False, header=True)
 
     # 작업 현황 파악을 위한 출력
     print('Organizing', csv_to_organize, 'completed\n')
@@ -125,86 +125,6 @@ def merge_land_jeju(csv_land, csv_jeju, csv_merged):
     # 새로운 csv 파일에 저장
     df_smp.to_csv(csv_merged, index=True, header=True)
     print('Merging completed to file', csv_merged)
-
-
-# 데이터프레임에서 잘못된 날짜의 인덱스를 리스트 형식으로 반환
-def filter_wrong_date(df):
-    df_past = df  # 확인하고 싶은 데이터프레임
-    wrong_time = []  # 누락된 시간의 인덱스을 저장할 리스트
-
-    # 데이터프레임 서칭 후, 적절하지 않은 시간대 확인하여 wrong_time 리스트에 저장
-    for i in range(0, len(df_past.index) - 1):
-        if df_past['date'][i] != df_past['date'][i + 1] + datetime.timedelta(days=1):
-            wrong_time.append(i + 1)
-
-    # 잘못된 날짜의 인덱스를 리스트로 반환
-    return wrong_time
-
-
-# 데이터프레임에서 잘못된 날짜 수정 (delete duplicates, add omitted dates)
-def fix_date(df, csv_to_update):
-    # df : 날짜를 수정하고 싶은 데이터프레임
-    # csv_to_update : 작업중인 csv 파일
-    df_to_fix = df  # df의 'date' column 값은 datetime.date 형식으로 전달될 것
-
-    # 잘못된 날짜의 인덱스를 저장하는 리스트
-    wrong_date = filter_wrong_date(df_to_fix)
-
-    # 잘못된 날짜가 없을 경우, function 종료
-    if len(wrong_date) == 0:
-        return
-
-    # 잘못된 날짜가 있을 경우, 날짜 찾아 수정하기
-    # wrong_time 에 값을 갖고 있는 동안 (잘못된 날짜가 있는동안)
-    while len(wrong_date) != 0:
-        # 데이터가 2개 이상인 날짜 삭제
-        to_delete = []  # 데이터가 2개 이상인 날짜를 저장할 리스트
-        for i in range(0, len(df_to_fix['date']) - 1):
-            # 데이터가 2개 이상인 날짜의 인덱스를 'to_delete' 리스트에 저장
-            if df_to_fix['date'][i] == df_to_fix['date'][i + 1]:
-                to_delete.append(i + 1)
-
-        # 작업 현황 파악을 위한 출력
-        print('to_delete =', to_delete)
-        # 해당 날짜 데이터 삭제
-        df_to_fix = df_to_fix.drop(to_delete, axis=0)
-
-        # 데이터프레임을 csv 에 넣었다가 다시 빼오기
-        df_to_fix.to_csv(csv_to_update, index=False, header=True)
-        df_to_fix = pd.read_csv(csv_to_update)
-        # 'date' column 값 str 에서 datetime.date type 으로 전환
-        for i in range(0, len(df_to_fix['date'])):
-            df_to_fix.at[i, 'date'] = datetime.datetime.strptime(df_to_fix['date'][i], '%Y-%m-%d').date()
-
-        # 데이터가 없는 날짜 추가
-        no_data = []  # 데이터가 없는 날짜를 저장할 리스트
-        # 데이터가 없는 날짜의 인덱스를 no_data 리스트에 추가
-        for m in range(0, len(df_to_fix['date']) - 1):
-            # 데이터가 없는 날짜의 인덱스를 'no_data' 리스트에 저장
-            if df_to_fix['date'][m] != df_to_fix['date'][m + 1] + datetime.timedelta(days=1):
-                no_data.append(m + 1)
-
-        # 작업 현황 파악을 위한 출력
-        print('no_data =', no_data)
-
-        # 데이터가 없는 날짜에 데이터 추가
-        for j in range(0, len(no_data)):
-            # 추가할 새로운 데이터를 리스트 형식으로 저장 ['date', nan, ... , nan]
-            new_data = []
-            new_data.append(df_to_fix['date'][no_data[j] + j] + datetime.timedelta(days=1))
-            for k in range(0, len(df_to_fix.columns) - 1):
-                new_data.append(np.NaN)
-
-            # 새로운 데이터 row 삽입
-            temp = df_to_fix[df_to_fix.index >= (no_data[j] + j)]
-            df_to_fix = df_to_fix[df_to_fix.index < (no_data[j] + j)]
-            df_to_fix.loc[len(df_to_fix)] = new_data
-            df_to_fix = df_to_fix.append(temp, ignore_index=True)
-
-        # 수정된 데이터프레임 'filter_wrong_date' 으로 다시 확인
-        wrong_date = filter_wrong_date(df_to_fix)
-    print("All dates fixed")
-    return df_to_fix
 
 
 # 새로운 데이터 수집 후 list 형식으로 return
@@ -433,12 +353,11 @@ def main():
     # 과거 데이터 다운로드 (http://epsis.kpx.or.kr/epsisnew/selectEkmaSmpShdGrid.do?menuId=050202)
     # organize_past_data('daily_land_smp_weighted_average.csv', 'land')
     # organize_past_data('daily_jeju_smp_weighted_average.csv', 'jeju')
-    # merge_land_jeju('daily_land_smp_weighted_average_formatted.csv', 'daily_jeju_smp_weighted_average_formatted.csv', 'daily_smp_weighted_average.csv')
-    # update('daily_smp_weighted_average.csv')
+    # merge_land_jeju('daily_land_smp_weighted_average.csv', 'daily_jeju_smp_weighted_average.csv', 'daily_smp_weighted_average.csv')
 
     # MySQL
     # toMySQL()
-    updateMySQL()
+    # updateMySQL()
     # deleteMySQL()
 
 

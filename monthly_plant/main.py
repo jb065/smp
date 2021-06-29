@@ -57,7 +57,7 @@ def organize_past_data(csv_to_organize):
     df = df.rename(columns={'month': 'cdate'})
 
     # 다시 csv 파일에 저장
-    df.to_csv('monthly_plant_formatted.csv', index=True, header=True)
+    df.to_csv('monthly_plant.csv', index=True, header=True)
 
     # 작업 현황 파악을 위한 출력
     print('Organizing', csv_to_organize, 'completed')
@@ -283,7 +283,6 @@ def deleteMySQL():
 def main():
     # 과거 데이터 다운로드 : http://epsis.kpx.or.kr/epsisnew/selectEkmaGcpBftGrid.do?menuId=050301
     # organize_past_data('monthly_plant.csv')
-    # update('monthly_plant_formatted.csv')
 
     # MySQL
     # toMySQL()
