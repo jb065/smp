@@ -1,4 +1,3 @@
-## 필요한 모듈 불러오기
 import datetime
 import numpy as np
 import requests
@@ -14,61 +13,49 @@ import sys
 import time
 
 
-# 과거 데이터 종합 (사이트에서 받은 파일 그대로 사용)
-# CSV 파일 다운로드 : https://openapi.kpx.or.kr/sukub.do (3개월치 씩 나누어 다운로드)
-def combine_past_data(csv_to_save):
-    # csv_to_save : 새로 저장할 csv 파일명
-    merged = []  # 데이터프레임 저장하는 리스트
+# merge csv files
+def merge_csv(csv_merged):
+    # csv_merged : csv file of merged data
 
-    # 모든 csv 파일에 대하여
+    # list of dataframes
+    dfs = []
+    print('Merging csv files to {}'.format(csv_merged))
+
+    # for all csv files
     files = [f for f in os.listdir('.') if os.path.isfile(f)]
     for f in files:
         filename, ext = os.path.splitext(f)
         if ext == '.csv':
-            read = pd.read_csv(f)
-            # column 이름 영어로 설정
-            read.columns = ['time', 'supply_capacity', 'demand', 'peak_demand', 'reserve', 'reserve_margin',
+            df = pd.read_csv(f)
+            df.columns = ['ctime', 'supply_capacity', 'demand', 'peak_demand', 'reserve', 'reserve_margin',
                             'operational_reserve', 'operational_reserve_ratio']
-            # 정각 데이터 추출
-            temp = read  # 불러온 데이터프레임의 index 개수를 파악하기 위한 복사
-            for i in range(0, len(temp.index)):
-                if read.loc[i].at['time'] % 10000 != 0:
-                    read = read.drop(i)
 
-            # 날짜와 시간값을 date, time 에 각각 datetime.date, datetime.time type 으로 저장
-            get_column = read['time'].tolist()
-            date_column = []
-            time_column = []
-            for i in range(0, len(get_column)):
-                clock = datetime.datetime.strptime(str(get_column[i]), '%Y%m%d%H%M%S')
-                date_column.append(clock.date())
-                time_column.append(clock.time())
-            read['time'] = time_column
-            read.insert(0, 'date', date_column)
+            # collect data for each hour
+            num_index = len(df.index)
+            for i in range(0, num_index):
+                if df.loc[i].at['ctime'] % 10000 != 0:
+                    df = df.drop(i)
 
-            # 작업 현황 파악을 위한 출력
-            print(filename)
+            # 'cdate' : str -> datetime.date | 'ctime' : str -> datetime.time
+            df.insert(0, 'cdate', df['ctime'].tolist())
+            df['cdate'] = df['cdate'].apply(lambda x: datetime.datetime.strptime(str(x)[0:14], '%Y%m%d%H%M%S').date())
+            df['ctime'] = df['ctime'].apply(lambda x: datetime.datetime.strptime(str(x)[0:14], '%Y%m%d%H%M%S').time())
 
-            # 수정된 데이터프레임을 리스트에 추가
-            merged.append(read)
+            dfs.append(df)
+            print(filename, ': formatted')
 
-    # 데이터프레임이 수집된 리스트로 종합 데이터프레임 생성 후 csv 파일 제작
-    # 생성 후, date, time column 이름 변경
-    df_result = pd.concat(merged).rename(columns={'date':'cdate', 'time':'ctime'})
+    # df_merged : merged dataframe with 'id' column
+    df_merged = pd.concat(dfs)
+    df_merged = df_merged.reset_index(drop=True)
+    df_merged.index = np.arange(1, len(df_merged) + 1)
+    df_merged.index.name = 'id'
 
-    # index reset 후, index column 이름 'id' 로 설정
-    df_result = df_result.reset_index(drop=True)
-    df_result.index = np.arange(1, len(df_result) + 1)
-    df_result.index.name = 'id'
-
-    # csv 파일에 종합된 데이터프레임 저장
-    df_result.to_csv(csv_to_save, index=True, header=True)
-
-    # 작업 현황 파악을 위한 출력
-    print('Files are combined')
+    # save as a new csv file
+    df_merged.to_csv(csv_merged, index=True, header=True)
+    print('Merging completed to file', csv_merged)
 
 
-# 데이터프레임에서 누락된 시간의 인덱스를 리스트 형식으로 반환
+# returns a list of times with wrong data
 def filter_wrong_time(df):
     df_past = df  # 확인하고 싶은 데이터프레임
     wrong_time = []  # 누락된 시간의 인덱스을 저장할 리스트
@@ -94,67 +81,53 @@ def filter_wrong_time(df):
 
 
 # 데이터에서 누락된 시간대 수정
-def fix_wrong_time(csv_to_read, csv_to_save):
-    # csv_to_read : 확인하고 싶은 csv 파일명
-    # csv_to_read : 새로 저장하고 싶은 csv 파일명
-    df_past = pd.read_csv(csv_to_read)  # 확인하고 싶은 csv 을 데이터프레임으로 저장
+def fix_wrong_time(csv_name):
+    # csv_name : name of the csv file
 
-    # 작업 현황 출력
-    print('Fixing time values in file', csv_to_read)
+    df = pd.read_csv(csv_name)
+    print('Fixing time values in', csv_name)
 
-    # 'cdate' 와 'ctime' column 값을 datetime.date, datetime.time type 으로 변환 후 다시 데이터프레임에 적용
-    date_column1 = df_past['cdate'].tolist()
-    date_column2 = []
-    for d in date_column1:
-        d = datetime.datetime.strptime(d, '%Y-%m-%d').date()
-        date_column2.append(d)
-    df_past['cdate'] = date_column2
+    # 'cdate' : str -> datetime.date | 'ctime' : str -> datetime.time
+    df['cdate'] = df['cdate'].apply(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d').date())
+    df['ctime'] = df['ctime'].apply(lambda x: datetime.datetime.strptime(x, '%H:%M:%S').time())
 
-    time_column1 = df_past['ctime'].tolist()
-    time_column2 = []
-    for t in time_column1:
-        t = datetime.datetime.strptime(t, '%H:%M:%S').time()
-        time_column2.append(t)
-    df_past['ctime'] = time_column2
+    # list of wrong time values
+    wrong_time = filter_wrong_time(df)
 
-    # 잘못된 시간대를 저장하는 리스트
-    wrong_time = filter_wrong_time(df_past)
-
-    # 누락된 시간이 없을 경우, function 종료
     if len(wrong_time) == 0:
+        print('All time values are appropriate.')
         return
 
-    # 잘못된 시간이 있을 경우, 시간대 찾아 수정하기
-    # wrong_time 에 값을 갖고 있는 동안 (누락된 시간이 있는동안)
+    # fix the time values that are inappropriate until all time values are appropriate
     while len(wrong_time) != 0:
         # wrong_time 리스트에 저장되어 있는 시간대 다음 시간을 데이터프레임에 추가
         for i in range(0, len(wrong_time)):
-            date1 = df_past.loc[wrong_time[i] + i].at['cdate']
-            time1 = df_past.loc[wrong_time[i] + i].at['ctime']
+            date1 = df.loc[wrong_time[i] + i].at['cdate']
+            time1 = df.loc[wrong_time[i] + i].at['ctime']
             datetime1 = datetime.datetime.combine(date1, time1)
             datetime2 = datetime1 + datetime.timedelta(hours=1, minutes=0, seconds=0)  # 누락된 시간
             # 누락된 시간의 데이터를 저장하는 new_data 리스트에 date 와 time 추가
             new_data = [0, datetime2.date(), datetime2.time()]
             # 나머지 값은 'nan' 값 부여
-            for j in range(0, len(df_past.columns) - 3):
+            for j in range(0, len(df.columns) - 3):
                 new_data.append(np.NaN)
             # new_data 를 누락된 시간의 row 에 추가
-            temp = df_past[df_past.index > (wrong_time[i] + i)]
-            df_past = df_past[df_past.index <= (wrong_time[i] + i)]
-            df_past.loc[len(df_past)] = new_data
-            df_past = df_past.append(temp, ignore_index=True)
+            temp = df[df.index > (wrong_time[i] + i)]
+            df = df[df.index <= (wrong_time[i] + i)]
+            df.loc[len(df)] = new_data
+            df = df.append(temp, ignore_index=True)
 
-        wrong_time = filter_wrong_time(df_past)  # 수정 후, 누락된 시간이 있는지 다시 한번 확인 (연속으로 2개가 누락된 경우를 방지)
+        wrong_time = filter_wrong_time(df)  # 수정 후, 누락된 시간이 있는지 다시 한번 확인 (연속으로 2개가 누락된 경우를 방지)
 
     # 날짜가 수정되면 id column 없애고 index 를 id column 으로 설정
-    df_past = df_past.drop('id', axis=1)
-    df_past.index = np.arange(1, len(df_past) + 1)
-    df_past.index.name = 'id'
+    df = df.drop('id', axis=1)
+    df.index = np.arange(1, len(df) + 1)
+    df.index.name = 'id'
 
-    df_past.to_csv(csv_to_save, index=True, header=True)
+    df.to_csv(csv_name, index=True, header=True)
 
     # 작업 현황 파악을 위한 출력
-    print('A new dataframe with appropriate time values is saved in a csv file,', csv_to_save)
+    print('A new dataframe with appropriate time values is saved in a csv file,', csv_name)
 
 
 # 새로운 데이터 업데이트
@@ -389,8 +362,8 @@ def deleteMySQL():
 # main function
 def main():
     # 과거 데이터 통합 및 형식 변형
-    # combine_past_data('hourly_powersupply.csv')
-    # fix_wrong_time('hourly_powersupply.csv', 'hourly_powersupply.csv')
+    # merge_csv('hourly_powersupply.csv')
+    # fix_wrong_time('hourly_powersupply.csv')
 
     # MySQL
     # toMySQL()
@@ -400,3 +373,13 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+# Manual
+# version : 2021-06-29
+# 1. Download csv files for each 3 months
+#    (https://openapi.kpx.or.kr/sukub.do)
+# 2. Save each of them like '20150101-20150331'
+# 3. Move the files to the directory same as main.py
+# 4. Run 'merge' to create a merged csv file
+# 5. Run 'fix_wrong_time' on the csv file created

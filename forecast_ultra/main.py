@@ -1,4 +1,3 @@
-# 필요한 모듈 불러오기
 import requests
 from urllib.parse import urlencode, quote_plus
 import pandas as pd
@@ -111,10 +110,8 @@ def get_ultra():
                 # Data type 변환 (시간값을 str 에서 datetime type 으로 변환)
                 df_temp['base_date'] = df_temp['base_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y%m%d').date())
                 df_temp['base_time'] = df_temp['base_time'].apply(lambda x: datetime.datetime.strptime(x, '%H%M').time())
-                df_temp['target_date'] = df_temp['target_date'].apply(
-                    lambda x: datetime.datetime.strptime(x, '%Y%m%d').date())
-                df_temp['target_time'] = df_temp['target_time'].apply(
-                    lambda x: datetime.datetime.strptime(x, '%H%M').time())
+                df_temp['target_date'] = df_temp['target_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y%m%d').date())
+                df_temp['target_time'] = df_temp['target_time'].apply(lambda x: datetime.datetime.strptime(x, '%H%M').time())
                 df_temp['city_x'] = df_temp['city_x'].apply(lambda x: int(x))
                 df_temp['city_y'] = df_temp['city_y'].apply(lambda x: int(x))
                 df_temp['forecast_temp'] = df_temp['forecast_temp'].apply(lambda x: float(x))
@@ -333,12 +330,13 @@ def deleteMySQL():
 
 # main function
 def main():
+    # get a csv file
+    # create_csv()
+
     # MySQL
     # toMySQL()
     # updateMySQL()
     # deleteMySQL()
-
-    # create_csv()
 
 
 if __name__ == '__main__':

@@ -1,4 +1,3 @@
-# 필요한 모듈 불러오기
 import requests
 from urllib.parse import urlencode, quote_plus
 import pandas as pd
@@ -14,33 +13,33 @@ import sys
 import time
 
 
-# 시간별 기온 - 기상청_지상(종관, ASOS) 시간자료 조회서비스(https://www.data.go.kr/data/15057210/openapi.do)
+# API url & key : 기상청_지상(종관, ASOS) 시간자료 조회서비스(https://www.data.go.kr/data/15057210/openapi.do)
 url = 'http://apis.data.go.kr/1360000/AsosHourlyInfoService/getWthrDataList'
 key = 'mhuJYMs8aVw+yxSF4sKzam/E0FlKQ0smUP7wZzcOp25OxpdG9L1lwA4JJuZu8Tlz6Dtzqk++vWDC5p0h56mtVA=='
 
-# 도시 리스트
+# list of cities
 cities = [['busan', 159], ['chungbuk', 131], ['chungnam', 133], ['daegu', 143], ['daejeon', 133], ['gangwon', 101],
           ['gwangju', 156], ['gyeongbuk', 143], ['gyeonggi', 119], ['gyeongnam', 155], ['incheon', 112],
           ['jeju', 184], ['jeonbuk', 146], ['jeonnam', 165], ['sejong', 239], ['seoul', 108], ['ulsan', 152]]
 
 
-# 과거 데이터 수집
-def get_past_data(end_month):
-    # end_month : (str) 데이터를 수집하려는 마지막 달 (e.g. '202104')
+# get the past data and format it into an appropriate csv file
+def get_past_data(end_date):
+    # end_date : (str) the last date for the data to be collected (e.g. '20210415')
+    target_date = datetime.datetime.strptime(end_date, '%Y%m%d')
 
     # for every city in the list
-    for i in range(15, len(cities)):
-        city_name = cities[i][0]
-        city_code = cities[i][1]
-        # 작업 현황 파악을 위한 출력
+    for city in cities:
+        city_name = city[0]
+        city_code = city[1]
         print('Getting hourly_temp data for', city_name)
 
-        startDt = datetime.datetime(2015, 1, 1)                            # api 호출 parameter 'startDt'
-        endDt = startDt + relativedelta(months=1) - relativedelta(days=1)  # api 호출 parameter 'endDt'
-        file_name = 'hourly_temp_' + city_name + '.csv'  # 저장할 csv 파일명
-        df_past = pd.DataFrame()  # 수집한 데이터를 저장할 데이터프레임 생성
+        startDt = datetime.datetime(2015, 1, 1)
+        endDt = startDt + relativedelta(months=1) - relativedelta(days=1)
+        file_name = 'hourly_temp_' + city_name + '.csv'
+        df_past = pd.DataFrame()
 
-        # 세종시의 경우 20190531 데이터부터 수집
+        # for 'sejong' city, collect data starting from 2019-05-31 11:00
         if city_name == 'sejong':
             queryParams = '?' + urlencode({quote_plus('ServiceKey'): key,
                                            quote_plus('pageNo'): '1',
@@ -58,15 +57,15 @@ def get_past_data(end_month):
             json_response = response.json()
             df_temp = pd.DataFrame.from_dict(json_response['response']['body']['items']['item'])
             df_temp = df_temp[['tm', 'ta']]
-            df_temp.columns = 'time', city_name  # 다른 도시일 경우 이름 수정
-            df_past = df_temp  # df_past : 최종 데이터프레임 / df_temp : 월별 임시 데이터프레임
+            df_temp.columns = 'ctime', city_name
+            df_past = df_temp
 
-            # 다음 while loop 에서 20190601 부터의 데이터 수집
-            startDt = datetime.datetime(2019, 6, 1)  # api 호출 parameter 'startDt'
-            endDt = startDt + relativedelta(months=1) - relativedelta(days=1)  # api 호출 parameter 'endDt'
+            # collect data starting from 2019-06-01 in the next iteration of while loop
+            startDt = datetime.datetime(2019, 6, 1)
+            endDt = startDt + relativedelta(months=1) - relativedelta(days=1)
 
-        # 월별로 나누어 데이터를 수집 (end_month 까지의 데이터 수집)
-        while startDt != datetime.datetime.strptime(end_month, '%Y%m') + relativedelta(months=1):
+        # get past_data for each month
+        while startDt < target_date:
             queryParams = '?' + urlencode({quote_plus('ServiceKey'): key,
                                            quote_plus('pageNo'): '1',
                                            quote_plus('numOfRows'): '999',
@@ -83,42 +82,39 @@ def get_past_data(end_month):
             json_response = response.json()
             df_temp = pd.DataFrame.from_dict(json_response['response']['body']['items']['item'])
             df_temp = df_temp[['tm', 'ta']]
-            df_temp.columns = 'time', city_name  # 다른 도시일 경우 이름 수정
-            print(startDt, endDt)  # 작업 현황 표시
+            df_temp.columns = 'ctime', city_name
+            print(startDt, endDt)
 
-            # startDt, endDt 업데이트 (한달씩 추가)
+            # increment startDt and endDt
             startDt = startDt + relativedelta(months=1)
             endDt = startDt + relativedelta(months=1) - relativedelta(days=1)
+            if endDt > target_date:
+                endDt = target_date
+                print('here')
 
-            # 종합 데이터프레임(df_past) 에 추가
+            # add df_temp (dataframe of each month) to df_past (dataframe of each city)
             if startDt == datetime.datetime(year=2015, month=1, day=1):
-                df_past = df_temp  # df_past : 최종 데이터프레임 / df_temp : 월별 임시 데이터프레임
+                df_past = df_temp
             else:
                 df_past = df_past.append(df_temp, ignore_index=True)
 
-        # 'time' column 값을 datetime type 으로 변환
-        tm_column = df_past['time'].tolist()
-        time_column = []
-        for i in range(0, len(tm_column)):
-            time_column.append(datetime.datetime.strptime(tm_column[i], '%Y-%m-%d %H:%M'))
-        df_past['time'] = time_column
+        # convert 'cdate' column to datetime.date
+        df_past['ctime'] = df_past['ctime'].apply(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d %H:%M'))
 
-        # csv 파일에 저장
+        # save as a new csv file
+        print('{} : hourly_temp data collected'.format(city_name))
+        print('Collected Data :\n', df_past)
         df_past.to_csv(file_name, index=False, header=True)
 
-        # 작업 현황 파악을 위한 출력
-        print(df_past)
-        print('\nPast data for', city_name, 'is collected.\n')
 
-
-# 세종시의 데이터에 2019년 이전 날짜 기입
+# add empty data before 2019-05-31
 def fix_sejong():
     df = pd.read_csv('hourly_temp_sejong.csv')
+    print('Sejong : Adding empty data before 2019-05-29 11:00')
 
-    print(df)
-    last_time = datetime.datetime.strptime(df.loc[0].at['time'], '%Y-%m-%d %H:%M:%S')
+    last_time = datetime.datetime.strptime(df.loc[0].at['ctime'], '%Y-%m-%d %H:%M:%S')
     new_time = datetime.datetime(2015, 1, 1)
-    df_top = pd.DataFrame(columns=['time', 'sejong'])
+    df_top = pd.DataFrame(columns=['ctime', 'sejong'])
 
     while new_time < last_time:
         new_data = [new_time, np.NaN]
@@ -127,6 +123,7 @@ def fix_sejong():
         print(new_time)
 
     df_top = df_top.append(df, ignore_index=True)
+    print('Sejong : Empty data added before 2019-05-29 11:00')
     print(df_top)
     df_top.to_csv('hourly_temp_sejong.csv', index=False, header=True)
 
@@ -144,8 +141,8 @@ def fix_time():
         print('Fixing dates for', csv_to_fix)
 
         # 'time' column 값 str 에서 datetime type 으로 전환
-        for n in range(0, len(df_to_fix['time'])):
-            df_to_fix.at[n, 'time'] = datetime.datetime.strptime(df_to_fix['time'][n], '%Y-%m-%d %H:%M:%S')
+        for n in range(0, len(df_to_fix['ctime'])):
+            df_to_fix.at[n, 'ctime'] = datetime.datetime.strptime(df_to_fix['ctime'][n], '%Y-%m-%d %H:%M:%S')
 
         # 잘못된 시간의 인덱스를 저장하는 리스트
         wrong_time = filter_wrong_time(df_to_fix)
@@ -161,9 +158,9 @@ def fix_time():
             while len(wrong_time) != 0:
                 # 데이터가 2개 이상인 시간 삭제
                 to_delete = []  # 데이터가 2개 이상인 시간를 저장할 리스트
-                for i in range(0, len(df_to_fix['time']) - 1):
+                for i in range(0, len(df_to_fix['ctime']) - 1):
                     # 데이터가 2개 이상인 시간의 인덱스를 'to_delete' 리스트에 저장
-                    if df_to_fix['time'][i] == df_to_fix['time'][i + 1]:
+                    if df_to_fix['ctime'][i] == df_to_fix['ctime'][i + 1]:
                         to_delete.append(i + 1)
 
                 # 작업 현황 파악을 위한 출력
@@ -176,15 +173,15 @@ def fix_time():
                 df_to_fix.to_csv(csv_to_fix, index=False, header=True)
                 df_to_fix = pd.read_csv(csv_to_fix)
                 # 'time' column 값 str 에서 datetime type 으로 전환
-                for k in range(0, len(df_to_fix['time'])):
-                    df_to_fix.at[k, 'time'] = datetime.datetime.strptime(df_to_fix['time'][k], '%Y-%m-%d %H:%M:%S')
+                for k in range(0, len(df_to_fix['ctime'])):
+                    df_to_fix.at[k, 'ctime'] = datetime.datetime.strptime(df_to_fix['ctime'][k], '%Y-%m-%d %H:%M:%S')
 
                 # 데이터가 없는 시간 추가
                 no_data = []  # 데이터가 없는 시간을 저장할 리스트
                 # 데이터가 없는 시간의 인덱스를 no_data 리스트에 추가
-                for m in range(0, len(df_to_fix['time']) - 1):
+                for m in range(0, len(df_to_fix['ctime']) - 1):
                     # 데이터가 없는 시간의 인덱스를 'no_data' 리스트에 저장
-                    if df_to_fix['time'][m] != df_to_fix['time'][m + 1] - datetime.timedelta(hours=1):
+                    if df_to_fix['ctime'][m] != df_to_fix['ctime'][m + 1] - datetime.timedelta(hours=1):
                         no_data.append(m)
 
                 # 작업 현황 파악을 위한 출력
@@ -194,7 +191,7 @@ def fix_time():
                 for j in range(0, len(no_data)):
                     # 추가할 새로운 데이터를 리스트 형식으로 저장 ['time', nan]
                     new_data = []
-                    new_data.append(df_to_fix['time'][no_data[j] + j] + datetime.timedelta(hours=1))
+                    new_data.append(df_to_fix['ctime'][no_data[j] + j] + datetime.timedelta(hours=1))
                     new_data.append(np.NaN)
 
                     # 새로운 데이터 row 삽입
@@ -218,7 +215,7 @@ def filter_wrong_time(df):
 
     # 데이터프레임 서칭 후, 적절하지 않은 시간대 확인하여 wrong_time 리스트에 저장
     for i in range(0, len(df_to_filter.index) - 1):
-        if df_to_filter['time'][i] != df_to_filter['time'][i + 1] - datetime.timedelta(hours=1):
+        if df_to_filter['ctime'][i] != df_to_filter['ctime'][i + 1] - datetime.timedelta(hours=1):
             wrong_time.append(i + 1)
 
     # 잘못된 시간의 인덱스를 리스트로 반환
@@ -227,29 +224,28 @@ def filter_wrong_time(df):
 
 # merge dataframes of cities in the correct format and save it as a csv file
 def merge():
-    # 도시별 데이터프레임을 담는 리스트
+    # list of dataframes
     dfs = []
+    print('Merging csv files of each city')
 
-    # 도시 리스트에 있는 도시의 csv 파일을 하나씩 부르기
+    # for every city in the list 'cities', get the dataframes of csv files and add them to the list 'dfs'
     for city in cities:
-        # csv 파일을 데이터프레임으로 저장하고 리스트에 추가
         df_city = pd.read_csv('hourly_temp_{}.csv'.format(city[0]))
         dfs.append(df_city)
 
-    # 도시별 데이터프레임을 하나의 데이터프레임에 합치기
-    df_combined = reduce(lambda left, right : pd.merge(left, right, on='time'), dfs)
-    print('df_combined : \n', df_combined)
+    # merge dataframes of all cities
+    df_merged = reduce(lambda left, right: pd.merge(left, right, on='ctime'), dfs)
+    print('df_merged : \n', df_merged)
 
     # list of column names of transposed dataframe
-    time_list = df_combined['time'].tolist()
+    time_list = df_merged['ctime'].tolist()
     time_list.insert(0, 'city')
 
-    # transpose the dataframe
-    df_combined.set_index('time', inplace=True)
-    df_transposed = df_combined.transpose()
+    # transpose the dataframe and assign new column names
+    df_merged.set_index('ctime', inplace=True)
+    df_transposed = df_merged.transpose()
     df_transposed = df_transposed.reset_index()
-    df_transposed = df_transposed.rename(columns={'index':'city'})
-    # assign column names
+    df_transposed = df_transposed.rename(columns={'index': 'city'})
     df_transposed.columns = time_list
     print('df_transposed : \n', df_transposed)
 
@@ -275,24 +271,19 @@ def merge():
         df_time.insert(0, 'ctime', datetime.datetime.strptime(data_time, '%Y-%m-%d %H:%M:%S').time())
         df_time.insert(0, 'cdate', datetime.datetime.strptime(data_time, '%Y-%m-%d %H:%M:%S').date())
         # change the column name 'YYYY-mm-dd HH:MM:SS' to 'temp'
-        df_time = df_time.rename(columns={data_time:'temp'})
+        df_time = df_time.rename(columns={data_time: 'temp'})
 
         # add the dataframe to the list
         dfs.append(df_time)
-
-        # print current status
         print(data_time)
 
-    # merge all the dataframes
+    # merge all the dataframes and add 'id' column
     df_result = pd.concat(dfs)
+    df_result.insert(0, 'id', np.arange(1, len(df_result.index) + 1))
 
-    # add 'id' column
-    df_result.insert(0, 'id', range(1, len(df_result.index) + 1))
-
-    # print the current status
+    # save as a new csv file
+    print('Merging csv files of each city completed. Saved as hourly_temp.csv')
     print('df_result : \n', df_result)
-
-    # save dataframe as a csv file
     df_result.to_csv('hourly_temp.csv', index=False, header=True)
 
 
@@ -587,10 +578,10 @@ def deleteMySQL():
 # main function
 def main():
     # Organize past data
-    # get_past_data('202105')
+    # get_past_data('20210629')
     # fix_sejong()
     # fix_time()
-    # merge()
+    merge()
 
     # MySQL
     # toMySQL()
@@ -600,3 +591,11 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+# Manual
+# version : 2021-06-29
+# 1. Run 'get_past_data('202105'). It will download hourly_temp data for each city via API
+# 2. Run 'fix_sejong()' because sejong does not contain data before 2019-05-31 11:00
+# 3. Run 'fix_time()' that deletes duplicates and add omitted time values
+# 4. Run 'merge()' to merge all the dataframes of cities into one csv file

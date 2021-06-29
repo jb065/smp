@@ -1,4 +1,3 @@
-# 필요한 모듈 불러오기
 import requests
 from urllib.parse import urlencode, quote_plus
 import pandas as pd
@@ -103,7 +102,7 @@ def get_mid():
                      'taMin8', 'taMax8', 'taMin9', 'taMax9', 'taMin10', 'taMax10']]
                 temp_data = df_temp.loc[0].tolist()
 
-                # format 에 맞게 데이터프레임 생성
+                # create a dataframe in appropriate format
                 column_format = ['base_date', 'base_time', 'target_date', 'city', 'city_code', 'temp_min', 'temp_max']
                 df_format = pd.DataFrame(columns=column_format)
                 target_date = tmFc.date() + relativedelta(days=3)
@@ -327,12 +326,13 @@ def deleteMySQL():
 
 # main function
 def main():
+    # get a csv file
+    # create_csv()
+
     # MySQL
     # toMySQL()
     # updateMySQL()
     # deleteMySQL()
-
-    # create_csv()
 
 
 if __name__ == '__main__':

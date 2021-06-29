@@ -1,4 +1,3 @@
-## 필요한 모듈 불러오기
 import requests
 from urllib.parse import urlencode, quote_plus
 import numpy as np
@@ -14,133 +13,83 @@ import sys
 import time
 
 
-# 과거 SMP 데이터 파일(csv) 정리 (http://epsis.kpx.or.kr/epsisnew/selectEkmaSmpShdGrid.do?menuId=050202)
-def organize_past_smp(csv_to_organize):
-    # csv_to_organize : 정리하고자 하는 csv 파일명
+# format a csv file of past data (http://epsis.kpx.or.kr/epsisnew/selectEkmaSmpShdGrid.do?menuId=050202)
+def format_csv(csv_name, location):
+    # csv_name : name of the csv file
 
-    # 작업 현황 파악을 위한 출력
-    print('Working on', csv_to_organize)
+    # get dataframe from the csv file
+    df_past = pd.read_csv(csv_name)
+    print('Formatting', csv_name)
 
-    # 과거 SMP 기록이 담긴 csv 파일을 불러와 데이터프레임으로 저장
-    df_past = pd.read_csv(csv_to_organize)
+    # change column names from Korean to English
+    df_past.columns = ['cdate'] + list(range(1, 25)) + ['max', 'min', 'wa']
 
-    # df_past 의 column 설정
-    # 1. 이름을 한국어에서 영어와 숫자로 변경
-    # 2. 최대, 최소, 가중평균 column 삭제
-    cols = ['date']
-    for i in range(1, 25):
-        cols.append(i)
-    cols.extend(['max', 'min', 'wa'])
-    df_past.columns = cols
+    # remove 'max', 'min', 'wa' columns
     df_past = df_past.drop(['max', 'min', 'wa'], axis=1)
 
-    # df_past 의 'date' column 값 str 에서 datetime.date type 으로 전환
-    for i in range(0, len(df_past['date'])):
-        df_past.at[i, 'date'] = datetime.datetime.strptime(df_past['date'][i], '%Y/%m/%d').date()
+    # convert 'cdate' column to datetime.date type, and reverse the dataframe
+    df_past['cdate'] = df_past['cdate'].apply(lambda x: datetime.datetime.strptime(str(x), '%Y/%m/%d').date())
+    df_past = df_past.reindex(index=df_past.index[::-1])
 
-    # df_past 를 df_smp 로 명세서 형식에 맞게 수정
-    smp_cols = ['cdate', 'ctime', 'smp']
-    df_smp = pd.DataFrame(columns=smp_cols)
-
-    # df_past 에서 날짜 하나씩 데이터 불러와 df_smp 에 저장
-    # 저장해야하는 날짜
+    # move data from df_past to df_wa while checking the dates
+    df_smp = pd.DataFrame(columns=['cdate', 'ctime', '{}_smp'.format(location)])
     correct_date = datetime.datetime(2015, 1, 1).date()
-    # 하루의 데이터를 가져와, 시간별로 기입
-    for i in range(0, len(df_past.index)):
-        get_data = df_past.loc[len(df_past.index) - i - 1].tolist()  # 하루의 데이터를 저장하는 리스트
 
-        # 다음 데이터의 날짜가 옳다면 데이터 그대로 저장
-        if get_data[0] == correct_date:
+    # iterate the row of df_past, transfer each row to df_smp
+    for index, row in df_past.iterrows():
+        row_data = row.values.tolist()
+
+        # if the date of the row is correct, move data of the row to df_smp
+        if row_data[0] == correct_date:
             for j in range(0, 24):
-                # datetime.time 의 시간값에 0-23시 값을 주어야해서 24시를 00시로 표기
-                if j == 23:
-                    to_add = [get_data[0], datetime.time(j - 23, 0, 0), get_data[j + 1]]
-                else:
-                    to_add = [get_data[0], datetime.time(j + 1, 0, 0), get_data[j + 1]]
-                df_smp.loc[len(df_smp)] = to_add
-            # df_smp 에 추가된 날짜 출력
-            print(get_data[0])
+                df_smp.loc[len(df_smp)] = [row_data[0], datetime.time(j, 0, 0), row_data[j + 1]]
             correct_date = correct_date + relativedelta(days=1)
+            print(row_data[0])
 
-        # 중복된 날짜가 있다면 저장하지 말 것
-        elif get_data[0] == correct_date - relativedelta(days=1):
-            print('Duplicate date:', get_data[0])
+        # if the date of the row has duplicate, don't move the data to df_smp
+        elif row_data[0] == correct_date - relativedelta(days=1):
+            print('----------Duplicate date:', row_data[0], '----------')
 
-        # 누락된 날짜가 있다면 새로운 데이터의 날짜 전날까지 빈데이터 추가 후 새로운 데이터 추가
+        # if the date of a row is omitted, add a new row with the date and an empty value until the appropriate date
         else:
-            # 새로운 날짜 전날까지 빈데이터 추가
-            while get_data[0] == correct_date + relativedelta(days=1):
+            while row_data[0] == correct_date + relativedelta(days=1):
                 for k in range(0, 24):
-                    # datetime.time 의 시간값에 0-23시 값을 주어야해서 24시를 00시로 표기
-                    if k == 23:
-                        to_add = [correct_date, datetime.time(k - 23, 0, 0), np.NaN]
-                    else:
-                        to_add = [correct_date, datetime.time(k + 1, 0, 0), np.NaN]
-                    df_smp.loc[len(df_smp)] = to_add
-                print('Omitted date:', correct_date)
+                    df_smp.loc[len(df_smp)] = [correct_date, datetime.time(k, 0, 0), None]
                 correct_date = correct_date + relativedelta(days=1)
-            # 새로운 데이터 추가
+                print('----------Omitted date: {}----------'.format(correct_date))
+
+            # then add the data of the row to df_wa
             for m in range(0, 24):
-                # datetime.time 의 시간값에 0-23시 값을 주어야해서 24시를 00시로 표기
-                if m == 23:
-                    to_add = [get_data[0], datetime.time(m - 23, 0, 0), get_data[m + 1]]
-                else:
-                    to_add = [get_data[0], datetime.time(m + 1, 0, 0), get_data[m + 1]]
-                df_smp.loc[len(df_smp)] = to_add
-            # df_smp 에 추가된 날짜 출력
-            print(get_data[0])
+                df_smp.loc[len(df_smp)] = [row_data[0], datetime.time(m, 0, 0), row_data[m + 1]]
             correct_date = correct_date + relativedelta(days=1)
+            print(row_data[0])
 
-    # 완성된 df_smp 출력
-    print(df_smp)
-
-    # 다시 csv 파일에 저장 (육지)
-    # df_smp.to_csv('hourly_land_smp_formatted.csv', index=False, header=True)
-    # 다시 csv 파일에 저장 (제주)
-    # df_smp.to_csv('hourly_jeju_smp_formatted.csv', index=False, header=True)
-    df_smp.to_csv(csv_to_organize, index=False, header=True)
+    # save as a new csv file
+    print('Formatting', csv_name, 'completed.')
+    print('Formatted Dataframe:\n', df_smp)
+    df_smp.to_csv(csv_name, index=False, header=True)
 
 
-# 육지, 제주 데이터 합치기
-def merge_land_jeju(csv_land, csv_jeju, csv_merged):
-    # csv_land : 육지 가중평균 데이터 csv 파일
-    # csv_jeju : 제주 가중평균 데이터 csv 파일
-    # csv_merged : 합쳐진 데이터를 저장할 새로운 csv 파일
+# merge csv files
+def merge_csv(csv_land, csv_jeju, csv_merged):
+    # csv_land : csv file of land_smp
+    # csv_jeju : csv file of jeju_smp
+    # csv_merged : csv file of both land and jeju smp
 
-    # 작업 현황 파악을 위한 출력
     print('Merging', csv_land, '&', csv_jeju, 'to', csv_merged)
 
-    # 육지, 제주 가중평균 데이터를 df_smp 데이터프레임에 합치기
-    df_land = pd.read_csv(csv_land)
-    df_jeju = pd.read_csv(csv_jeju)
-    dfs = [df_land, df_jeju]
+    # df_smp : merged dataframe of land and jeju smp
+    dfs = [pd.read_csv(csv_land), pd.read_csv(csv_jeju)]
     df_smp = reduce(lambda left, right: pd.merge(left, right, on=['cdate', 'ctime']), dfs)
 
-    # 합쳐진 데이터프레임 df_smp 의 'cdate' column 을 datetime.date type 으로 변환
-    old_cdate_column = df_smp['cdate'].tolist()
-    date_column = []
-    for i in range(0, len(old_cdate_column)):
-        clock = datetime.datetime.strptime(str(old_cdate_column[i]), '%Y-%m-%d').date()
-        date_column.append(clock)
-    df_smp['cdate'] = date_column
+    # 'cdate' : str -> datetime.date | 'ctime' : str -> datetime.time | add 'id' column
+    df_smp['cdate'] = df_smp['cdate'].apply(lambda x: datetime.datetime.strptime(x, '%Y-%m-%d').date())
+    df_smp['ctime'] = df_smp['ctime'].apply(lambda x: datetime.datetime.strptime(x, '%H:%M:%S').time())
+    df_smp = df_smp.reset_index(drop=True)
+    df_smp.insert(0, 'id', np.arange(1, len(df_smp) + 1))
 
-    # 합쳐진 데이터프레임 df_smp 의 'ctime' column 을 datetime.time type 으로 변환
-    old_ctime_column = df_smp['ctime'].tolist()
-    time_column = []
-    for i in range(0, len(old_ctime_column)):
-        clock = datetime.datetime.strptime(str(old_ctime_column[i]), '%H:%M:%S').time()
-        time_column.append(clock)
-    df_smp['ctime'] = time_column
-
-    # index column 1부터 시작 및 이름 'id' 로 설정
-    df_smp.index = np.arange(1, len(df_smp) + 1)
-    df_smp.index.name = 'id'
-
-    # smp column 이름 'land_smp', 'jeju_smp' 로 변경
-    df_smp = df_smp.rename(columns={'smp_x': 'land_smp', 'smp_y': 'jeju_smp'})
-
-    # 새로운 csv 파일에 저장
-    df_smp.to_csv(csv_merged, header=True)
+    # save as a new csv file
+    df_smp.to_csv(csv_merged, index=False, header=True)
     print('Merging completed to file', csv_merged)
 
 
@@ -404,13 +353,10 @@ def deleteMySQL():
 
 # main function
 def main():
-    # 과거 데이터 다운로드 : http://epsis.kpx.or.kr/epsisnew/selectEkmaSmpShdGrid.do?menuId=050202
-    # 과거 육지 smp 데이터 정리
-    # organize_past_smp('hourly_land_smp.csv')
-    # 과거 제주 smp 데이터 정리
-    # organize_past_smp('hourly_jeju_smp.csv')
-    # 과거 데이터 (육지 & 제주) 합치기
-    # merge_land_jeju('hourly_land_smp.csv', 'hourly_jeju_smp.csv', 'hourly_smp.csv')
+    # format the downloaded csv files of past data
+    # format_csv('hourly_land_smp.csv', 'land')
+    # format_csv('hourly_jeju_smp.csv', 'jeju')
+    # merge_csv('hourly_land_smp.csv', 'hourly_jeju_smp.csv', 'hourly_smp.csv')
 
     # MySQL
     # toMySQL()
@@ -420,3 +366,13 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+# Manual
+# version : 2021-06-29
+# 1. Download csv files of land and jeju smp weighted average from the link
+#    (http://epsis.kpx.or.kr/epsisnew/selectEkmaSmpShdGrid.do?menuId=050202)
+# 2. Save each of them as 'hourly_land_smp.csv' and 'hourly_jeju_smp.csv'
+# 3. Run 'format_csv' on both files
+# 4. Run 'merge_csv' to create a csv file that has the data of both land and jeju
+# 5. Three functions can be run all at once

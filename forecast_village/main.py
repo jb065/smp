@@ -1,4 +1,3 @@
-# 필요한 모듈 불러오기
 import requests
 from urllib.parse import urlencode, quote_plus
 import pandas as pd
@@ -338,6 +337,9 @@ def deleteMySQL():
 
 # main function
 def main():
+    # get a csv file
+    # create_csv()
+
     # MySQL
     # toMySQL()
     # updateMySQL()

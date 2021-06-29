@@ -1,4 +1,3 @@
-# 필요한 모듈 불러오기
 import pandas as pd
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -16,51 +15,36 @@ from sqlalchemy import create_engine
 import sys
 
 
-# 과거 데이터 정리 (http://epsis.kpx.or.kr/epsisnew/selectEkmaGcpBftGrid.do?menuId=050301)
-def organize_past_data(csv_to_organize):
-    # csv_to_organize : 정리할 과거 데이터를 갖고 있는 csv 파일
-    df = pd.read_csv(csv_to_organize)
+# format a csv file of past data (http://epsis.kpx.or.kr/epsisnew/selectEkmaGcpBftGrid.do?menuId=050301)
+def format_csv(csv_name):
+    # csv_name : name of the csv file
 
-    # 작업 현황 파악을 위한 출력
-    print('Organizing', csv_to_organize)
+    # get dataframe from the csv file
+    df = pd.read_csv(csv_name)
+    print('Formatting', csv_name)
 
-    # column 이름 영어로 설정, 'location' column 삭제
-    df.columns = ['month', 'location', 'nuclear', 'bituminous', 'anthracite', 'oil', 'lng', 'amniotic', 'others',
-                  'total']
+    # change column names from Korean to English, and delete 'location' column
+    df.columns = ['cdate', 'location', 'nuclear', 'bituminous', 'anthracite', 'oil', 'lng', 'amniotic', 'others', 'total']
     df = df.drop('location', axis=1)
 
-    # 'month' column 의 값을 datetime.date 형식으로 변환
-    get_column = df['month'].tolist()  # 'month' column 을 리스트로 저장
-    new_column = []
-    for i in range(0, len(get_column)):
-        new_month = datetime.datetime.strptime(df.loc[i].at['month'], '%Y/%m').date()
-        new_column.append(new_month)
-    df['month'] = new_column
+    # convert 'cdate' column to datetime.date type
+    df['cdate'] = df['cdate'].apply(lambda x: datetime.datetime.strptime(str(x), '%Y/%m').date())
 
-    # 2015년 이전의 데이터는 삭제
-    index = new_column.index(datetime.datetime(2015, 1, 1).date())  # 2015년 1월의 인덱스
-    to_delete = []  # 삭제할 row 의 인덱스 저장할 리스트
-    for i in range(index + 1, len(new_column)):
-        to_delete.append(i)
-    df = df.drop(to_delete, axis=0)
+    # delete data before year 2015
+    for index, row in df.iterrows():
+        row_data = row.values.tolist()
+        if row_data[0] < datetime.datetime(2015, 1, 1).date():
+            df = df.drop(index, axis=0)
 
-    # index reset
-    df = df.reset_index(drop=True)
-    # 과거 데이터가 상단에 위치하도록 설정 후 index reset 한번 더
+    # reverse the dataframe, reset the index, and add 'id' column
     df = df.reindex(index=df.index[::-1])
     df = df.reset_index(drop=True)
-    # index column 이름 'id' 로 설정
-    df.index = np.arange(1, len(df) + 1)
-    df.index.name = 'id'
+    df.insert(0, 'id', np.arange(1, len(df) + 1))
 
-    # 'month' column -> 'cdate' 으로 이름 변경
-    df = df.rename(columns={'month': 'cdate'})
-
-    # 다시 csv 파일에 저장
-    df.to_csv('monthly_plant.csv', index=True, header=True)
-
-    # 작업 현황 파악을 위한 출력
-    print('Organizing', csv_to_organize, 'completed')
+    # save as a new csv file
+    print('Formatting', csv_name, 'completed.')
+    print('Formatted Dataframe:\n', df)
+    df.to_csv(csv_name, index=False, header=True)
 
 
 # 새로운 데이터 업데이트
@@ -282,8 +266,8 @@ def deleteMySQL():
 
 # main function
 def main():
-    # 과거 데이터 다운로드 : http://epsis.kpx.or.kr/epsisnew/selectEkmaGcpBftGrid.do?menuId=050301
-    # organize_past_data('monthly_plant.csv')
+    # format the downloaded csv file of past data
+    # format_csv('monthly_plant.csv')
 
     # MySQL
     # toMySQL()
@@ -293,3 +277,12 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+# Manual
+# version : 2021-06-29
+# 1. Download csv file from the link (to 2 decimal places)
+#    (http://epsis.kpx.or.kr/epsisnew/selectEkmaGcpBftGrid.do?menuId=050301)
+# 2. Save the file as 'monthly_plant.csv'
+# 3. run 'format_csv' on the csv file
+

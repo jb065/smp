@@ -1,4 +1,3 @@
-## 필요한 모듈 불러오기
 import datetime
 import numpy as np
 import pandas as pd
@@ -15,90 +14,69 @@ from sqlalchemy import create_engine
 import sys
 
 
-def organize_past_data():
-    # 크롬 창 뜨지 않게 설정 추가
+# get the past data and format it into an appropriate csv file
+def get_past_data():
+    print('Getting past data of monthly_commodity')
+
+    # set chrome driver
     chrome_options = Options()
     chrome_options.add_argument("--headless")
-
-    # webdriver 설정
     driver = webdriver.Chrome(
         r'C:/Users/boojw/Downloads/chromedriver_win32/chromedriver.exe', options=chrome_options)
 
-    # headless 상태에서 download 가 가능하도록 설정
+    # enables to download in headless chrome setting
     params = {'behavior': 'allow', 'downloadPath': os.getcwd()}
     driver.execute_cdp_cmd('Page.setDownloadBehavior', params)
 
-    # 원하는 링크 접속
+    # enter the link and download the xlsx file
     url = 'https://www.worldbank.org/en/research/commodity-markets'
     driver.get(url)
-
-    # 업데이트된 xlsx 파일 다운로드
     target = driver.find_element_by_xpath(
         '//*[@id="1"]/div/div/div[1]/div/div/div/div/div[1]/div[1]/div/div/table/tbody/tr[3]/td[1]/a')
     target.click()
     print('Downloading the file...')
 
-    # 파일이 다운로드 될때까지 기다리기
+    # wait until the file is downloaded
     while not os.path.exists('CMO-Historical-Data-Monthly.xlsx'):
         time.sleep(1)
     print('Download completed')
+    driver.close()
 
-    # xlsx 파일을 데이터프레임으로 저장
-    # skiprows : 원하지 않는 rows 제외 (상단의 제목 부분)
+    # df : downloaded xlsx file to dataframe with skipped rows
     df = pd.read_excel('CMO-Historical-Data-Monthly.xlsx', sheet_name='Monthly Prices', skiprows=[0, 1, 2, 3])
 
-    # column 으로 설정하고 싶은 row 를 리스트로 불러와 column 으로 설정
+    # set column names
     cols = df.iloc[1].tolist()
     cols.pop(0)
     cols.insert(0, 'cdate')
     df.columns = cols
 
-    # row 1 지우기 (불필요한 row)
-    df = df.drop(1, axis=0)
-
-    # 두바이유, 호주 석탄, 일본 LNG 제외한 모든 columns 삭제
+    # drop unnecessary rows and columns
+    df = df.drop([0, 1], axis=0)
     df = df[['cdate', 'COAL_AUS', 'COAL_SAFRICA', 'CRUDE_PETRO', 'CRUDE_BRENT', 'CRUDE_DUBAI', 'CRUDE_WTI', 'iNATGAS', 'NGAS_EUR', 'NGAS_US', 'NGAS_JP']]
 
-    # index 재설정
+    # set column names to lower cases and reset the index
     df = df.reset_index(drop=True)
-    # column 이름 설정 (소문자로 통일, inatgas 이름 변경)
     df.columns = [x.lower() for x in df.columns]
     df = df.rename(columns={'inatgas': 'ngas_index'})
 
-    # 2015년 이전의 데이터 삭제
-    month_column = df['cdate'].tolist()
-    month_column.pop(0)
-    new_month_column = [np.NaN]  # 새로운 'month' column
-    to_delete = []  # 삭제할 2015년 이전의 데이터 인덱스를 담는 리스트
+    # convert 'cdate' column to datetime.date type
+    df['cdate'] = df['cdate'].apply(lambda x: datetime.datetime.strptime(x, '%YM%m').date())
 
-    # 'month' 의 값이 2015년 이전이면, to_delete 에 인덱스를 추가
-    for month in month_column:
-        month_datetime = datetime.datetime.strptime(month, '%YM%m').date()
-        if month_datetime < datetime.datetime(year=2015, month=1, day=1).date():
-            to_delete.append(month_column.index(month) + 1)
-        else:
-            new_month_column.append(month_datetime)
+    # delete data before year 2015
+    for index, row in df.iterrows():
+        row_data = row.values.tolist()
+        if row_data[0] < datetime.datetime(2015, 1, 1).date():
+            df = df.drop(index, axis=0)
 
-    # to_delete 에 추가된 인덱스 데이터프레임에서 삭제
-    df = df.drop(to_delete, axis=0)
-
-    # 'cdate' column 에 새로운 리스트 기입
-    df['cdate'] = new_month_column
-
-    # delete 'unit' row
-    df = df.drop(0, axis=0)
-
-    # id column 설정 (index 를 리스트로 가져와 첫 element 를 'unit' 으로 설정)
+    # create 'id' column
     df = df.reset_index(drop=True)
-    df.index = np.arange(1, len(df) + 1)
-    id_column = df.index.tolist()
-    df.insert(0, 'id', id_column)
+    df.insert(0, 'id', np.arange(1, len(df) + 1))
 
-    # 완성된 데이터프레임 출력 후 csv 파일에 저장
-    print(df)
+    print('monthly_commodity past data save in monthly_commodity.csv')
     df.to_csv('monthly_commodity.csv', index=False, header=True)
 
-    # delete the downloaded xlsx file after collecting data
+    # delete the downloaded xlsx file
     os.remove('CMO-Historical-Data-Monthly.xlsx')
 
 
@@ -339,8 +317,8 @@ def deleteMySQL():
 
 # main function
 def main():
-    # 과거 데이터 정리 (No need to download the file manually : https://www.worldbank.org/en/research/commodity-markets)
-    # organize_past_data()
+    # get the past data and format it into an appropriate csv file
+    # get_past_data()
 
     # MySQL
     # toMySQL()
@@ -350,3 +328,10 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+# Manual
+# version : 2021-06-29
+# 1. Run 'get_past_data'. It will automatically download the file from
+#    (https://www.worldbank.org/en/research/commodity-markets)
+# 2. Formatted csv file, 'monthly_commodity.csv' will be saved in the directory
