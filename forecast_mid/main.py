@@ -20,6 +20,12 @@ cities = [['busan', '11H20201'], ['chungbuk', '11C10301'], ['chungnam', '11C2040
               ['ulsan', '11H20101']]
 
 
+# creates a csv file of forecast_mid
+def create_csv():
+    df = get_mid()
+    df.to_csv('forecast_mid.csv', index=False, header=True)
+
+
 # returns template of dataframe based on base_time
 def get_template(base_time):
     # get values for dataframe
@@ -225,6 +231,7 @@ def toMySQL():
 # update MySQL_mid
 def updateMySQL():
     table_name = 'SMP.eric_forecast_mid'
+    print('Updating {}'.format(table_name))
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
@@ -325,6 +332,7 @@ def main():
     # updateMySQL()
     # deleteMySQL()
 
+    # create_csv()
 
 
 if __name__ == '__main__':

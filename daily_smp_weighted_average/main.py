@@ -265,6 +265,7 @@ def toMySQL():
 # update to MySQL
 def updateMySQL():
     table_name = 'SMP.eric_daily_smp_weighted_average'
+    print('Updating {}'.format(table_name))
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
@@ -326,7 +327,7 @@ def deleteMySQL():
 
         # delete the target
         cursor = cnx.cursor()
-        cursor.execute("DELETE FROM {} WHERE id > 2361 ".format(table_name))
+        cursor.execute("DELETE FROM {} WHERE id > 2371 ".format(table_name))
         cnx.commit()
         print('Deletion completed.\n')
 
@@ -357,7 +358,7 @@ def main():
 
     # MySQL
     # toMySQL()
-    # updateMySQL()
+    updateMySQL()
     # deleteMySQL()
 
 

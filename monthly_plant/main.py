@@ -245,6 +245,7 @@ def updateMySQL():
 # delete rows in MySQL
 def deleteMySQL():
     table_name = 'SMP.eric_monthly_plant'
+    print('Updating {}'.format(table_name))
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()

@@ -19,6 +19,12 @@ cities = [['busan', 98, 76], ['chungbuk', 69, 107], ['chungnam', 68, 100], ['dae
           ['sejong', 66, 103], ['seoul', 60, 127], ['ulsan', 102, 84]]
 
 
+# create a csv file of forecast_village
+def create_csv():
+    df = get_village()
+    df.to_csv('forecast_village.csv', index=False, header=True)
+
+
 # returns template of dataframe based on base_time
 def get_template(base_time):
     # get values for dataframe
@@ -232,6 +238,7 @@ def toMySQL():
 # update MySQL_village
 def updateMySQL():
     table_name = 'SMP.eric_forecast_village'
+    print('Updating {}'.format(table_name))
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
@@ -335,6 +342,8 @@ def main():
     # toMySQL()
     # updateMySQL()
     # deleteMySQL()
+
+    # create_csv()
 
 
 if __name__ == '__main__':

@@ -491,6 +491,7 @@ def toMySQL():
 # update MySQL
 def updateMySQL():
     table_name = 'SMP.eric_hourly_temp'
+    print('Updating {}'.format(table_name))
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
@@ -585,10 +586,11 @@ def deleteMySQL():
 
 # main function
 def main():
+    # Organize past data
     # get_past_data('202105')
-    fix_sejong()
-    fix_time()
-    merge()
+    # fix_sejong()
+    # fix_time()
+    # merge()
 
     # MySQL
     # toMySQL()

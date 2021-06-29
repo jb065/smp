@@ -308,6 +308,7 @@ def toMySQL():
 # update MySQL
 def updateMySQL():
     table_name = 'SMP.eric_hourly_smp'
+    print('Updating {}'.format(table_name))
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
