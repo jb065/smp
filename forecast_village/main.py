@@ -9,6 +9,7 @@ from mysql.connector import errorcode
 from sqlalchemy import create_engine
 import sys
 import time
+import pytz
 
 
 # 도시 목록 [도시이름, x좌표, y좌표] / 초단기, 동네예보
@@ -61,7 +62,8 @@ def get_village():
     # base_time(발표시각) 설정
     # API base_time : 0200, 0500, 0800, 1100, 1400, 1700, 2000, 2300 (8 times per day)
     # API available 5 minutes after base_time
-    now_ = datetime.datetime.now()
+    now_ = datetime.datetime.now(pytz.timezone('Asia/Seoul'))
+    now_ = datetime.datetime.combine(now_.date(), now_.time())
     if now_.hour % 3 == 2 and now_.minute > 5:
         base_time = now_.replace(minute=0, second=0, microsecond=0)
     elif now_.hour % 3 == 2 and now_.minute <= 5:

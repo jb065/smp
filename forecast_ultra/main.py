@@ -9,6 +9,7 @@ from mysql.connector import errorcode
 from sqlalchemy import create_engine
 import sys
 import time
+import pytz
 
 
 # 도시 목록 [도시이름, x좌표, y좌표] / 초단기, 동네예보
@@ -60,7 +61,8 @@ def get_ultra():
     # base_time(발표시각) 설정
     # 매시간 30분에 생성되며 약 10분마다 최신 정보로 업데이트됨
     # 현재시각에서 가장 가까운 과거 30분을 base_time 으로 자동 설정
-    now_ = datetime.datetime.now()
+    now_ = datetime.datetime.now(pytz.timezone('Asia/Seoul'))
+    now_ = datetime.datetime.combine(now_.date(), now_.time())
     if now_.minute < 30:
         base_time = now_.replace(minute=30, second=0, microsecond=0) - relativedelta(hours=1)
     else:

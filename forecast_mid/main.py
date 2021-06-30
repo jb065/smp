@@ -9,6 +9,7 @@ from mysql.connector import errorcode
 from sqlalchemy import create_engine
 import sys
 import time
+import pytz
 
 
 # 도시 목록 [도시이름, 도시코드]
@@ -59,7 +60,8 @@ def get_template(base_time):
 def get_mid():
     # tmFc 설정
     # 중기예보는 매일 6시, 18시에 발표되기 때문에, 현재시간이 아닌 해당시간을 input 으로 넣어야한다
-    now_ = datetime.datetime.now()
+    now_ = datetime.datetime.now(pytz.timezone('Asia/Seoul'))
+    now_ = datetime.datetime.combine(now_.date(), now_.time())
     if now_ < now_.replace(hour=6, minute=0, second=0, microsecond=0):
         tmFc = (now_ - datetime.timedelta(days=1)).replace(hour=18, minute=0, second=0, microsecond=0)
     elif now_ < now_.replace(hour=18, minute=0, second=0, microsecond=0):
@@ -331,7 +333,7 @@ def main():
 
     # MySQL
     # toMySQL()
-    # updateMySQL()
+    updateMySQL()
     # deleteMySQL()
 
 
