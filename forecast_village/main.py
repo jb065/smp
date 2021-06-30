@@ -262,30 +262,35 @@ def updateMySQL():
         # get new data
         cursor = cnx.cursor()
         new_data = get_village()
+        print('\nVillage forecast data:\n', new_data)
 
-        # check if any new data is collected
-        if type(new_data) == str:
-            print('updateMySQL cancelled : No data is collected\n')
-        else:
-            print('\nVillage forecast data:\n', new_data)
-            # insert each row of df_ultra to MySQL
-            for index, row in new_data.iterrows():
-                try:
-                    # insert into table
-                    row_data = row.values.tolist()
-                    query_string = 'INSERT INTO {} (base_date, base_time, target_date, target_time, city, city_x, city_y, ' \
-                                   'forecast_temp) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ' \
-                                   'ON DUPLICATE KEY UPDATE ' \
-                                   'forecast_temp = IF(forecast_temp IS NULL, %s, forecast_temp);'.format(table_name)
-                    cursor.execute(query_string, row_data + row_data[7:8])
-                    cnx.commit()
-                    print('New data inserted into MySQL table.')
+        # insert each row of df_ultra to MySQL
+        for index, row in new_data.iterrows():
+            try:
+                # insert into table
+                row_data = row.values.tolist()
+                query_string = 'INSERT INTO {} (base_date, base_time, target_date, target_time, city, city_x, city_y, ' \
+                               'forecast_temp) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ' \
+                               'ON DUPLICATE KEY UPDATE ' \
+                               'forecast_temp = IF(forecast_temp IS NULL, %s, forecast_temp);'.format(table_name)
+                cursor.execute(query_string, row_data + row_data[7:8])
+                cnx.commit()
 
-                except mysql.connector.Error as error:
-                    print('Failed to insert into MySQL table. {}'.format(error))
+                # check for changes in the MySQL table
+                if cursor.rowcount == 0:
+                    print('Data already exists in the MySQL table. No change was made.', row_data)
+                elif cursor.rowcount == 1:
+                    print('New data inserted into MySQL table.', row_data)
+                elif cursor.rowcount == 2:
+                    print('Null data is updated.', row_data)
+                else:
+                    print('Unexpected row count.', row_data)
 
-                except:
-                    print("Unexpected error:", sys.exc_info(), '\n')
+            except mysql.connector.Error as error:
+                print('Failed to insert into MySQL table. {}'.format(error))
+
+            except:
+                print("Unexpected error:", sys.exc_info(), '\n')
 
     except mysql.connector.Error as error:
         print('Failed to insert into MySQL table. {}\n'.format(error))
@@ -315,7 +320,7 @@ def deleteMySQL():
 
         # delete the target
         cursor = cnx.cursor()
-        cursor.execute("DELETE FROM {} WHERE id > 2398;".format(table_name))
+        cursor.execute("DELETE FROM {} WHERE id > 3690;".format(table_name))
         cnx.commit()
         print('Deletion completed.')
 
@@ -346,8 +351,6 @@ def main():
     # toMySQL()
     # updateMySQL()
     # deleteMySQL()
-
-    # create_csv()
 
 
 if __name__ == '__main__':

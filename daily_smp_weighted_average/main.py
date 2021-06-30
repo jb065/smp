@@ -263,6 +263,16 @@ def updateMySQL():
                        'jeju_wa = IF(jeju_wa IS NULL, %s, jeju_wa);'.format(table_name)
         cursor.execute(query_string, new_data + new_data[1:3])
         cnx.commit()
+
+        # check for changes in the MySQL table
+        if cursor.rowcount == 0:
+            print('Data already exists in the MySQL table. No change was made.', new_data)
+        elif cursor.rowcount == 1:
+            print('New data inserted into MySQL table.', new_data)
+        elif cursor.rowcount == 2:
+            print('Null data is updated.', new_data)
+        else:
+            print('Unexpected row count.', new_data)
         print('New data inserted into MySQL table.\n')
 
     except mysql.connector.Error as error:

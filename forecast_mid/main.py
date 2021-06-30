@@ -268,7 +268,16 @@ def updateMySQL():
                                'temp_max = IF(temp_max IS NULL, %s, temp_max);'.format(table_name)
                 cursor.execute(query_string, row_data + row_data[5:7])
                 cnx.commit()
-                print('New data inserted into MySQL table.')
+
+                # check for changes in the MySQL table
+                if cursor.rowcount == 0:
+                    print('Data already exists in the MySQL table. No change was made.', row_data)
+                elif cursor.rowcount == 1:
+                    print('New data inserted into MySQL table.', row_data)
+                elif cursor.rowcount == 2:
+                    print('Null data is updated.', row_data)
+                else:
+                    print('Unexpected row count.', row_data)
 
             except mysql.connector.Error as error:
                 print('Failed to insert into MySQL table. {}'.format(error))
@@ -333,7 +342,7 @@ def main():
 
     # MySQL
     # toMySQL()
-    updateMySQL()
+    # updateMySQL()
     # deleteMySQL()
 
 

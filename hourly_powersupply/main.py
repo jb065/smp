@@ -309,7 +309,16 @@ def updateMySQL():
                            'operational_reserve_ratio = IF(operational_reserve_ratio IS NULL, %s, operational_reserve_ratio);'.format(table_name)
             cursor.execute(query_string, new_data + new_data[2:9])
             cnx.commit()
-            print('New data inserted into MySQL table.\n')
+
+            # check for changes in the MySQL table
+            if cursor.rowcount == 0:
+                print('Data already exists in the MySQL table. No change was made.', new_data)
+            elif cursor.rowcount == 1:
+                print('New data inserted into MySQL table.', new_data)
+            elif cursor.rowcount == 2:
+                print('Null data is updated.', new_data)
+            else:
+                print('Unexpected row count.', new_data)
 
     except mysql.connector.Error as error:
         print('Failed to insert into MySQL table {}\n'.format(error))
