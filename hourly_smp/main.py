@@ -11,6 +11,7 @@ from mysql.connector import errorcode
 from sqlalchemy import create_engine
 import sys
 import time
+import pytz
 
 
 # format a csv file of past data (http://epsis.kpx.or.kr/epsisnew/selectEkmaSmpShdGrid.do?menuId=050202)
@@ -116,7 +117,7 @@ def update():
     key = 'mhuJYMs8aVw+yxSF4sKzam/E0FlKQ0smUP7wZzcOp25OxpdG9L1lwA4JJuZu8Tlz6Dtzqk++vWDC5p0h56mtVA=='
 
     df_update = pd.DataFrame(columns=['cdate', 'ctime', 'land_smp', 'jeju_smp'])
-    target_date = datetime.datetime.now().date()
+    target_date = datetime.datetime.now(pytz.timezone('Asia/Seoul')).date()
     df_template = get_template(target_date)
     retry_error_code = ['01', '02', '03', '04', '05']
 

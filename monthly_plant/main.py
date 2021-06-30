@@ -13,6 +13,7 @@ import mysql.connector
 from mysql.connector import errorcode
 from sqlalchemy import create_engine
 import sys
+import pytz
 
 
 # format a csv file of past data (http://epsis.kpx.or.kr/epsisnew/selectEkmaGcpBftGrid.do?menuId=050301)
@@ -50,7 +51,7 @@ def format_csv(csv_name):
 # 새로운 데이터 업데이트
 def update():
     # target month of data
-    target_month = (datetime.datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)).date()
+    target_month = (datetime.datetime.now(pytz.timezone('Asia/Seoul')).replace(day=1, hour=0, minute=0, second=0, microsecond=0) - relativedelta(months=1)).date()
     print('Collecting data for', target_month)
 
     # 크롬 창 뜨지 않게 설정 추가
@@ -271,7 +272,7 @@ def main():
 
     # MySQL
     # toMySQL()
-    # updateMySQL()
+    updateMySQL()
     # deleteMySQL()
 
 

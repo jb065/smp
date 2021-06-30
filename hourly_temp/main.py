@@ -11,6 +11,7 @@ from mysql.connector import errorcode
 from sqlalchemy import create_engine
 import sys
 import time
+import pytz
 
 
 # API url & key : 기상청_지상(종관, ASOS) 시간자료 조회서비스(https://www.data.go.kr/data/15057210/openapi.do)
@@ -314,7 +315,7 @@ def get_template(base_date):
 # 새로운 데이터 업데이트
 def update():
     # 새로운 데이터를 가져올 날짜 (호출하는 날의 전날)
-    target_date = (datetime.datetime.now() - relativedelta(days=1)).date()
+    target_date = (datetime.datetime.now(pytz.timezone('Asia/Seoul')) - relativedelta(days=1)).date()
     param_date = target_date.strftime('%Y%m%d')
 
     df_template = get_template(target_date)
@@ -581,11 +582,11 @@ def main():
     # get_past_data('20210629')
     # fix_sejong()
     # fix_time()
-    merge()
+    # merge()
 
     # MySQL
     # toMySQL()
-    # updateMySQL()
+    updateMySQL()
     # deleteMySQL()
 
 

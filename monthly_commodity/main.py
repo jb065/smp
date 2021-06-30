@@ -12,6 +12,7 @@ import mysql.connector
 from mysql.connector import errorcode
 from sqlalchemy import create_engine
 import sys
+import pytz
 
 
 # get the past data and format it into an appropriate csv file
@@ -82,7 +83,7 @@ def get_past_data():
 
 def update():
     # target month of data
-    target_month = (datetime.datetime.now().replace(day=1, hour=0, minute=0, microsecond=0) - relativedelta(months=1)).date()
+    target_month = (datetime.datetime.now(pytz.timezone('Asia/Seoul')).replace(day=1, hour=0, minute=0, microsecond=0) - relativedelta(months=1)).date()
     print('Collecting data for', target_month)
 
     # 크롬 창 뜨지 않게 설정 추가

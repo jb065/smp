@@ -11,6 +11,7 @@ from mysql.connector import errorcode
 from sqlalchemy import create_engine
 import sys
 import time
+import pytz
 
 
 # merge csv files
@@ -140,7 +141,8 @@ def update():
     response = requests.get(url + queryParams)
     tree = ET.ElementTree(ET.fromstring(response.text))
     retry_error_code = ['01', '02', '03', '04', '05']
-    target_time = datetime.datetime.now().replace(minute=0, second=0, microsecond=0)
+    target_time = datetime.datetime.now(pytz.timezone('Asia/Seoul')).replace(minute=0, second=0, microsecond=0)
+    target_time = datetime.datetime.combine(target_time.date(), target_time.time())
 
     # try collecting data from API for 5 times
     for j in range(0, 5):
@@ -152,7 +154,7 @@ def update():
         if result_code == '00':
             get_time = datetime.datetime.strptime(tree.find('.//baseDatetime').text, '%Y%m%d%H%M%S')
 
-            # collect data if the basetime is appropriate
+            # collect data if the base_time is appropriate
             if get_time == target_time:
                 new_data = [get_time.date(), get_time.time(), float(tree.find('.//suppAbility').text),
                             float(tree.find('.//currPwrTot').text), float(tree.find('.//forecastLoad').text),
@@ -367,7 +369,7 @@ def main():
 
     # MySQL
     # toMySQL()
-    # updateMySQL()
+    updateMySQL()
     # deleteMySQL()
 
 
