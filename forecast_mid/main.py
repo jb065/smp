@@ -36,20 +36,14 @@ def get_template(base_time):
     for i in range(0, num_forecast):
         target_column = target_column + [target_time + relativedelta(days=i)] * len(cities)
 
-    city_name = []
-    city_code = []
-    for city in cities:
-        city_name.append(city[0])
-        city_code.append(city[1])
-
     # create dataframe
     df = pd.DataFrame(index=np.arange(len(cities) * num_forecast),
                       columns=['base_date', 'base_time', 'target_date', 'city', 'city_code', 'temp_min', 'temp_max'])
     df['base_date'] = base_time.date()
     df['base_time'] = base_time.time()
     df['target_date'] = [t.date() for t in target_column]
-    df['city'] = city_name * num_forecast
-    df['city_code'] = city_code * num_forecast
+    df['city'] = [city[0] for city in cities] * num_forecast
+    df['city_code'] = [city[1] for city in cities] * num_forecast
     df['temp_min'] = None
     df['temp_max'] = None
 
@@ -301,6 +295,7 @@ def updateMySQL():
 # delete rows in MySQL
 def deleteMySQL():
     table_name = 'SMP.eric_forecast_mid'
+    print('Deleting data in {}'.format(table_name))
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()

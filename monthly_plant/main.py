@@ -84,7 +84,7 @@ def update():
                                                            '9)').text, '%Y/%m').date()
 
     if new_month != target_month:
-        print('Wrong month for new data. Update cancelled.')
+        print('Wrong month for new data. Returning empty data.')
         return [target_month, None, None, None, None, None, None, None, None]
     else:
         # collect new data (month, nuclear, bituminous, anthracite, oil, lng, amniotic, others, total)
@@ -174,6 +174,7 @@ def toMySQL():
 # update MySQL
 def updateMySQL():
     table_name = 'SMP.eric_monthly_plant'
+    print('Updating {}'.format(table_name))
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
@@ -239,7 +240,7 @@ def updateMySQL():
 # delete rows in MySQL
 def deleteMySQL():
     table_name = 'SMP.eric_monthly_plant'
-    print('Updating {}'.format(table_name))
+    print('Deleting data in {}'.format(table_name))
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
@@ -281,7 +282,7 @@ def main():
 
     # MySQL
     # toMySQL()
-    updateMySQL()
+    # updateMySQL()
     # deleteMySQL()
 
 

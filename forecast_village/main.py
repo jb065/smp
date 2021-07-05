@@ -28,19 +28,13 @@ def create_csv():
 # returns template of dataframe based on base_time
 def get_template(base_time):
     # get values for dataframe
-    num_forecast = int (22 - (base_time.hour - 5) / 3)
-    target_time = base_time + datetime.timedelta(hours=4)
+    num_forecast = int (70 - (base_time.hour - 2))
+    if base_time.hour >= 17:
+        num_forecast = num_forecast + 24
+    target_time = base_time + datetime.timedelta(hours=1)
     target_column = []
     for i in range(0, num_forecast):
-        target_column = target_column + [target_time + datetime.timedelta(hours=i*3)] * len(cities)
-
-    city_name = []
-    city_x = []
-    city_y = []
-    for city in cities:
-        city_name.append(city[0])
-        city_x.append(city[1])
-        city_y.append(city[2])
+        target_column = target_column + [target_time + datetime.timedelta(hours=i)] * len(cities)
 
     # create dataframe
     df = pd.DataFrame(index=np.arange(len(cities) * num_forecast),
@@ -49,24 +43,24 @@ def get_template(base_time):
     df['base_time'] = base_time.time()
     df['target_date'] = [t.date() for t in target_column]
     df['target_time'] = [t.time() for t in target_column]
-    df['city'] = city_name * num_forecast
-    df['city_x'] = city_x * num_forecast
-    df['city_y'] = city_y * num_forecast
+    df['city'] = [city[0] for city in cities] * num_forecast
+    df['city_x'] = [city[1] for city in cities] * num_forecast
+    df['city_y'] = [city[2] for city in cities] * num_forecast
     df['forecast_temp'] = None
 
     return df
 
 
-# 동네(단기)예보 (https://www.data.go.kr/data/15057682/openapi.do)
+# 동네(단기)예보 (https://www.data.go.kr/tcs/dss/selectApiDataDetailView.do?publicDataPk=15084084)
 def get_village():
     # base_time(발표시각) 설정
     # API base_time : 0200, 0500, 0800, 1100, 1400, 1700, 2000, 2300 (8 times per day)
     # API available 5 minutes after base_time
     now_ = datetime.datetime.now(pytz.timezone('Asia/Seoul'))
     now_ = datetime.datetime.combine(now_.date(), now_.time())
-    if now_.hour % 3 == 2 and now_.minute > 5:
+    if now_.hour % 3 == 2 and now_.minute > 10:
         base_time = now_.replace(minute=0, second=0, microsecond=0)
-    elif now_.hour % 3 == 2 and now_.minute <= 5:
+    elif now_.hour % 3 == 2 and now_.minute <= 10:
         base_time = now_.replace(hour=now_.hour - 3, minute=0, second=0, microsecond=0)
     else:
         base_time = now_.replace(hour=now_.hour - (now_.hour % 3) - 1, minute=0, second=0, microsecond=0)
@@ -85,7 +79,7 @@ def get_village():
             # 작업 현황 파악을 위한 출력
             print(cities[i][0], ': Getting village forecast data')
 
-            url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService/getVilageFcst'
+            url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst'
             key = 'mhuJYMs8aVw+yxSF4sKzam/E0FlKQ0smUP7wZzcOp25OxpdG9L1lwA4JJuZu8Tlz6Dtzqk++vWDC5p0h56mtVA=='
             queryParams = '?' + urlencode({quote_plus('ServiceKey'): key,
                                            quote_plus('pageNo'): '1',
@@ -104,7 +98,7 @@ def get_village():
             if result_code == '00':
                 # make a dataframe 'df_temp' that contains new data
                 df_temp = pd.DataFrame.from_dict(json_response['response']['body']['items']['item'])
-                df_temp = df_temp[df_temp['category'] == 'T3H'].drop('category', axis=1)
+                df_temp = df_temp[df_temp['category'] == 'TMP'].drop('category', axis=1)
                 df_temp = df_temp.reset_index(drop=True)
 
                 # set names and order of columns
@@ -112,7 +106,7 @@ def get_village():
                 df_temp = df_temp[['baseDate', 'baseTime', 'fcstDate', 'fcstTime', 'city', 'nx', 'ny', 'fcstValue']]
                 df_temp.columns = ['base_date', 'base_time', 'target_date', 'target_time', 'city', 'city_x', 'city_y', 'forecast_temp']
 
-                # Data type 변환
+                # convert to appropriate data type
                 df_temp['base_date'] = df_temp['base_date'].apply(lambda x : datetime.datetime.strptime(x, '%Y%m%d').date())
                 df_temp['base_time'] = df_temp['base_time'].apply(lambda x: datetime.datetime.strptime(x, '%H%M').time())
                 df_temp['target_date'] = df_temp['target_date'].apply(lambda x: datetime.datetime.strptime(x, '%Y%m%d').date())
@@ -308,6 +302,7 @@ def updateMySQL():
 # delete rows in MySQL
 def deleteMySQL():
     table_name = 'SMP.eric_forecast_village'
+    print('Deleting data in {}'.format(table_name))
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()

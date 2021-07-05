@@ -26,20 +26,12 @@ def create_csv():
 
 # returns template of dataframe based on base_time
 def get_template(base_time):
-    # get values for dataframe
-    num_forecast = 6 - base_time.hour % 3
+    # number of forecasted values
+    num_forecast = 6
     target_time = base_time + datetime.timedelta(minutes=30)
     target_column = []
     for i in range(0, num_forecast):
         target_column = target_column + [target_time + datetime.timedelta(hours=i)] * len(cities)
-
-    city_name = []
-    city_x = []
-    city_y = []
-    for city in cities:
-        city_name.append(city[0])
-        city_x.append(city[1])
-        city_y.append(city[2])
 
     # create dataframe
     df = pd.DataFrame(index=np.arange(len(cities) * num_forecast),
@@ -48,15 +40,15 @@ def get_template(base_time):
     df['base_time'] = base_time.time()
     df['target_date'] = [t.date() for t in target_column]
     df['target_time'] = [t.time() for t in target_column]
-    df['city'] = city_name * num_forecast
-    df['city_x'] = city_x * num_forecast
-    df['city_y'] = city_y * num_forecast
+    df['city'] = [city[0] for city in cities] * num_forecast
+    df['city_x'] = [city[1] for city in cities] * num_forecast
+    df['city_y'] = [city[2] for city in cities] * num_forecast
     df['forecast_temp'] = None
 
     return df
 
 
-# 초단기예보 (https://www.data.go.kr/data/15057682/openapi.do)
+# 초단기예보 (http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst)
 def get_ultra():
     # base_time(발표시각) 설정
     # 매시간 30분에 생성되며 약 10분마다 최신 정보로 업데이트됨
@@ -81,7 +73,7 @@ def get_ultra():
         for i in range(0, len(cities)):
             print(cities[i][0], ': Getting ultra-fast forecast data')
 
-            url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService/getUltraSrtFcst'
+            url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst'
             key = 'mhuJYMs8aVw+yxSF4sKzam/E0FlKQ0smUP7wZzcOp25OxpdG9L1lwA4JJuZu8Tlz6Dtzqk++vWDC5p0h56mtVA=='
             queryParams = '?' + urlencode({quote_plus('ServiceKey'): key,
                                            quote_plus('pageNo'): '1',
@@ -305,6 +297,7 @@ def updateMySQL():
 # delete rows in MySQL
 def deleteMySQL():
     table_name = 'SMP.eric_forecast_ultra'
+    print('Deleting data in {}'.format(table_name))
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()

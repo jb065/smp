@@ -14,6 +14,7 @@ import mysql.connector
 from mysql.connector import errorcode
 from sqlalchemy import create_engine
 import sys
+import pytz
 
 
 # format a csv file of past data (http://epsis.kpx.or.kr/epsisnew/selectEkmaSmpShdGrid.do?menuId=050202)
@@ -113,7 +114,7 @@ def update():
     except TimeoutException:
         print('Land : Loading took too much time. Returning empty data.')
         driver.quit()
-        return
+        return [datetime.datetime.now(pytz.timezone('Asia/Seoul')).date() - relativedelta(days=1), None, None]
 
     soup = BeautifulSoup(driver.page_source, 'html.parser')
 
@@ -144,7 +145,7 @@ def update():
     except TimeoutException:
         print('Jeju : Loading took too much time. Returning empty data')
         driver.quit()
-        return
+        return new_data + [float(i) for i in value_list] + [None]
 
     # 제주 가중평균값 추가
     soup = BeautifulSoup(driver.page_source, 'html.parser')
@@ -273,7 +274,6 @@ def updateMySQL():
             print('Null data is updated.', new_data)
         else:
             print('Unexpected row count.', new_data)
-        print('New data inserted into MySQL table.\n')
 
     except mysql.connector.Error as error:
         print('Failed to insert into MySQL table {}\n'.format(error))
@@ -291,6 +291,7 @@ def updateMySQL():
 # delete rows in MySQL
 def deleteMySQL():
     table_name = 'SMP.eric_daily_smp_weighted_average'
+    print('Deleting data in {}'.format(table_name))
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
         ip_address = text_file.readline().strip()
