@@ -2,6 +2,29 @@
 ## 설명
 시간별 SMP 데이터를 수집하는 프로그램
 
+## 사용방법
+### 과거 데이터 수집 및 가공
+1. 아래 링크에서 각각 육지와 제주에 대한 과거 데이터의 csv 파일 다운로드
+<br>http://epsis.kpx.or.kr/epsisnew/selectEkmaSmpShdGrid.do?menuId=050202
+2. 각 파일명을 'hourly_land_smp.csv', 'hourly_jeju_smp.csv' 로 저장
+3. 수집한 csv 파일들을 main.py 파일이 있는 디렉토리로 이동
+4. 두 파일에 대하여 format_csv() 함수 실행하여 형식에 맞게 수정
+<br>```format_csv('hourly_land_smp.csv', 'land')```
+<br>```format_csv('hourly_jeju_smp.csv', 'jeju')```
+5. merge_csv() 함수 실행하여 육지와 제주 데이터를 종합하는 csv 파일 생성
+<br>```merge_csv('hourly_land_smp.csv', 'hourly_jeju_smp.csv', 'hourly_smp.csv')```
+7. 과거 데이터를 담는 종합 csv 파일 ('hourly_smp.csv') 생성 완료
+
+### 과거 데이터 MySQL table 에 입력
+1. toMySQL() 함수 실행<br>`toMySQL()`
+2. 파일명이 함수 내에서 설정되기 때문에 parameter 값 입력 불필요
+
+### 새로운 데이터 수집
+1. updateMySQL() 함수 실행
+2. 수집 시점 및 주기
+	- 1번 / 하루
+	- 정오에 프로그램 실행하여 오늘 데이터 수집
+
 ## 함수 설명
 - <b>format_csv(csv_name, location)
 	- 다운로드한 과거 데이터 csv 파일을 형식에 맞게 formatting 하고 다시 csv 파일에 저장하는 함수
@@ -56,27 +79,3 @@
 - <b>getMySQLInfo()
     - 저장된 MySQL_info.txt 파일에서 MySQL connection 을 생성하는데 필요한 정보 수집
     - host_name, port, db_name, id, pw 값 수집하여 dictionary 형태로 return
-
-## 사용방법
-### 과거 데이터 수집 및 가공
-1. 아래 링크에서 각각 육지와 제주에 대한 과거 데이터의 csv 파일 다운로드
-<br>http://epsis.kpx.or.kr/epsisnew/selectEkmaSmpShdGrid.do?menuId=050202
-2. 각 파일명을 'hourly_land_smp.csv', 'hourly_jeju_smp.csv' 로 저장
-3. 수집한 csv 파일들을 main.py 파일이 있는 디렉토리로 이동
-4. 두 파일에 대하여 format_csv() 함수 실행하여 형식에 맞게 수정
-<br>```format_csv('hourly_land_smp.csv', 'land')```
-<br>```format_csv('hourly_jeju_smp.csv', 'jeju')```
-5. merge_csv() 함수 실행하여 육지와 제주 데이터를 종합하는 csv 파일 생성
-<br>```merge_csv('hourly_land_smp.csv', 'hourly_jeju_smp.csv', 'hourly_smp.csv')```
-7. 과거 데이터를 담는 종합 csv 파일 ('hourly_smp.csv') 생성 완료
-
-
-### 과거 데이터 MySQL table 에 입력
-1. toMySQL() 함수 실행<br>`toMySQL()`
-2. 파일명이 함수 내에서 설정되기 때문에 parameter 값 입력 불필요
-
-### 새로운 데이터 수집
-1. updateMySQL() 함수 실행
-2. 수집 시점 및 주기
-	- 1번 / 하루
-	- 정오에 프로그램 실행하여 오늘 데이터 수집

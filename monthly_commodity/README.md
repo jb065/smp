@@ -3,6 +3,23 @@
 월별 자원 가격 데이터를 수집하는 프로그램
 <br>수집 데이터 : 석유 시장가, 석탄 시장가, LNG 시장가 등
 
+## 사용방법
+### 과거 데이터 수집 및 가공
+1. get_past_data() 함수를 실행시켜 월별 자원 가격 데이터를 csv 파일로 저장
+<br>```get_past_data()```
+2. 함수를 실행하면 형식에 맞게 수정된 csv 파일 ('monthly_commodity.csv') 로 저장됨
+
+### 과거 데이터 MySQL table 에 입력
+1. toMySQL() 함수 실행<br>`toMySQL()`
+2. 파일명이 함수 내에서 설정되기 때문에 parameter 값 입력 불필요
+
+### 새로운 데이터 수집
+1. updateMySQL() 함수 실행
+2. 수집 시점 및 주기
+	- 1번 / 한달
+	- 매달 20일에 이전 달의 데이터 수집
+	<br>e.g. 7월 20일에 6월 데이터 수집
+
 ## 함수 설명
 - <b>get_past_data()
 	- 웹사이트에서 월별 자원 가격 데이터를 갖는 csv 파일을 다운로드하여 형식에 맞게 수정하는 함수
@@ -37,20 +54,3 @@
 - <b>getMySQLInfo()
     - 저장된 MySQL_info.txt 파일에서 MySQL connection 을 생성하는데 필요한 정보 수집
     - host_name, port, db_name, id, pw 값 수집하여 dictionary 형태로 return
-
-## 사용방법
-### 과거 데이터 수집 및 가공
-1. get_past_data() 함수를 실행시켜 월별 자원 가격 데이터를 csv 파일로 저장
-<br>```get_past_data()```
-2. 함수를 실행하면 형식에 맞게 수정된 csv 파일 ('monthly_commodity.csv') 로 저장됨
-
-### 과거 데이터 MySQL table 에 입력
-1. toMySQL() 함수 실행<br>`toMySQL()`
-2. 파일명이 함수 내에서 설정되기 때문에 parameter 값 입력 불필요
-
-### 새로운 데이터 수집
-1. updateMySQL() 함수 실행
-2. 수집 시점 및 주기
-	- 1번 / 한달
-	- 매달 20일에 이전 달의 데이터 수집
-	<br>e.g. 7월 20일에 6월 데이터 수집
