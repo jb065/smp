@@ -175,7 +175,7 @@ def toMySQL():
     csv_data = pd.read_csv('{}.csv'.format(data_name))
     engine = create_engine('mysql+mysqldb://{}:{}@{}:{}/{}'.format(id, pw, host_name, port, db_name), echo=False)
     csv_data.to_sql(name='eric_{}'.format(data_name), con=engine, if_exists='replace', index=False, chunksize=10000)
-    print('{}.csv is added to MySQL\n'.format(data_name))
+    print('{}.csv is added to MySQL'.format(data_name))
 
     try:
         cnx = mysql.connector.connect(user=id, password=pw, host=host_name, database=db_name)
@@ -191,6 +191,11 @@ def toMySQL():
     try:
         cursor = cnx.cursor()
 
+        # add id column
+        query_string = "ALTER TABLE {} ADD id INT FIRST;".format(table_name)
+        cursor.execute(query_string)
+        cnx.commit()
+
         # set datatype and features
         query_string = "ALTER TABLE {} " \
                        "CHANGE COLUMN `id` `id` INT NOT NULL AUTO_INCREMENT, " \
@@ -205,26 +210,26 @@ def toMySQL():
                        "ADD PRIMARY KEY (`id`);".format(table_name)
         cursor.execute(query_string)
         cnx.commit()
-        print('Data type and features are set\n')
+        print('Data type and features are set')
 
         # set an unique key
         query_string = "ALTER TABLE {} ADD UNIQUE KEY uidx " \
                        "(base_date, base_time, target_date, target_time, city);".format(table_name)
         cursor.execute(query_string)
         cnx.commit()
-        print('Unique Key(uidx) is set\n')
+        print('Unique Key(uidx) is set')
 
     except mysql.connector.Error as error:
-        print('Failed set datatype and features of MySQL table {}\n'.format(error))
+        print('Failed set datatype and features of MySQL table {}'.format(error))
 
     except:
-        print("Unexpected error:", sys.exc_info(), '\n')
+        print("Unexpected error:", sys.exc_info())
 
     finally:
         if cnx.is_connected():
             cursor.close()
             cnx.close()
-            print('MySQL connection is closed\n')
+            print('MySQL connection is closed')
 
 
 # update MySQL_village
@@ -256,7 +261,7 @@ def updateMySQL():
         # get new data
         cursor = cnx.cursor()
         new_data = get_village()
-        print('\nVillage forecast data:\n', new_data)
+        print('Village forecast data:\n', new_data)
 
         # insert each row of df_ultra to MySQL
         for index, row in new_data.iterrows():
@@ -284,19 +289,19 @@ def updateMySQL():
                 print('Failed to insert into MySQL table. {}'.format(error))
 
             except:
-                print("Unexpected error:", sys.exc_info(), '\n')
+                print("Unexpected error:")
 
     except mysql.connector.Error as error:
-        print('Failed to insert into MySQL table. {}\n'.format(error))
+        print('Failed to insert into MySQL table. {}'.format(error))
 
     except:
-        print("Unexpected error:", sys.exc_info(), '\n')
+        print("Unexpected error:", sys.exc_info())
 
     finally:
         if cnx.is_connected():
             cursor.close()
             cnx.close()
-            print('MySQL connection is closed\n')
+            print('MySQL connection is closed')
 
 
 # delete rows in MySQL
@@ -331,13 +336,13 @@ def deleteMySQL():
             print(error)
 
     except:
-        print("Unexpected error:", sys.exc_info(), '\n')
+        print("Unexpected error:", sys.exc_info())
 
     finally:
         if cnx.is_connected():
             cursor.close()
             cnx.close()
-            print('MySQL connection is closed\n')
+            print('MySQL connection is closed')
 
 
 # get MySQL information from 'MySQL_info.txt'

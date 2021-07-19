@@ -7,7 +7,7 @@
 ### 과거 데이터 수집 및 가공
 1. get_past_data() 함수를 실행시켜 월별 자원 가격 데이터를 csv 파일로 저장
 <br>```get_past_data()```
-2. 함수를 실행하면 형식에 맞게 수정된 csv 파일 ('monthly_commodity.csv') 로 저장됨
+2. 함수를 실행하면 웹사이트에서 csv 파일을 다운받아 형식에 맞게 수정하여 'monthly_commodity.csv' 로 저장됨
 
 ### 과거 데이터 MySQL table 에 입력
 1. toMySQL() 함수 실행<br>`toMySQL()`

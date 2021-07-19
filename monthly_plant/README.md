@@ -7,7 +7,7 @@
 1. 아래 웹사이트에서 과거 데이터를 갖는 csv 파일 다운로드
 <br>http://epsis.kpx.or.kr/epsisnew/selectEkmaGcpBftGrid.do?menuId=050301
 2. 다운로드한 csv 파일명을 'monthly_plant.csv' 로 수정
-3. csv 파일에 대하여 format_csv() 함수를 실행시켜 형식 수정
+3. csv 파일에 대하여 format_csv() 함수를 실행시켜 형식에 맞게 수정
 <br>```format_csv('monthly_plant.csv')```
 
 ### 과거 데이터 MySQL table 에 입력

@@ -11,7 +11,7 @@
 3. 수집한 csv 파일들을 main.py 파일이 있는 디렉토리로 이동
 4. main.py 파일이 있는 디렉토리에 수집한 csv 파일 이외 다른 csv 파일이 없어야 함
 5. merge() 함수 실행
-6. merge() 함수를 통해 생성된 종합 csv 파일에 대하여 fix_wront_time() 함수 실행
+6. merge() 함수를 통해 생성된 종합 csv 파일에 대하여 fix_wrong_time() 함수 실행
 7. 과거 데이터를 담는 종합 csv 파일 생성 완료
 
 ### 과거 데이터 MySQL table 에 입력

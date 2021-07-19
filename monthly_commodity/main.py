@@ -74,7 +74,7 @@ def get_past_data():
     df = df.reset_index(drop=True)
     df.insert(0, 'id', np.arange(1, len(df) + 1))
 
-    print('monthly_commodity past data save in monthly_commodity.csv')
+    print('Past data of monthly_commodity is saved as monthly_commodity.csv')
     df.to_csv('monthly_commodity.csv', index=False, header=True)
 
     # delete the downloaded xlsx file
@@ -196,25 +196,25 @@ def toMySQL():
                        "ADD PRIMARY KEY (`id`);".format(table_name)
         cursor.execute(query_string)
         cnx.commit()
-        print('Data type and features are set\n')
+        print('Data type and features are set')
 
         # set an unique key
         query_string = "ALTER TABLE {} ADD UNIQUE KEY uidx (cdate);".format(table_name)
         cursor.execute(query_string)
         cnx.commit()
-        print('Unique Key(uidx) is set\n')
+        print('Unique Key(uidx) is set')
 
     except mysql.connector.Error as error:
-        print('Failed set datatype and features of MySQL table {}\n'.format(error))
+        print('Failed set datatype and features of MySQL table {}'.format(error))
 
     except:
-        print("Unexpected error:", sys.exc_info(), '\n')
+        print("Unexpected error:", sys.exc_info())
 
     finally:
         if cnx.is_connected():
             cursor.close()
             cnx.close()
-            print('MySQL connection is closed\n')
+            print('MySQL connection is closed')
 
 
 # update MySQL
@@ -246,7 +246,7 @@ def updateMySQL():
         # get new data by calling update function
         cursor = cnx.cursor()
         new_data = update()
-        print('New data to be added :', new_data, '\n')
+        print('New data to be added :', new_data)
 
         # insert into table
         query_string = 'INSERT INTO {} (cdate, coal_aus, coal_safrica, crude_petro, crude_brent, crude_dubai, ' \
@@ -277,16 +277,16 @@ def updateMySQL():
             print('Unexpected row count.', new_data)
 
     except mysql.connector.Error as error:
-        print('Failed to insert into MySQL table. {}\n'.format(error))
+        print('Failed to insert into MySQL table. {}'.format(error))
 
     except:
-        print("Unexpected error:", sys.exc_info(), '\n')
+        print("Unexpected error:", sys.exc_info())
 
     finally:
         if cnx.is_connected():
             cursor.close()
             cnx.close()
-            print('MySQL connection is closed\n')
+            print('MySQL connection is closed')
 
 
 # delete rows in MySQL
@@ -310,7 +310,7 @@ def deleteMySQL():
         cursor = cnx.cursor()
         cursor.execute("DELETE FROM {} WHERE id > 78".format(table_name))
         cnx.commit()
-        print('Deletion completed.\n')
+        print('Deletion completed.')
 
     except mysql.connector.Error as error:
         if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
@@ -321,13 +321,13 @@ def deleteMySQL():
             print(error)
 
     except:
-        print("Unexpected error:", sys.exc_info(), '\n')
+        print("Unexpected error:", sys.exc_info())
 
     finally:
         if cnx.is_connected():
             cursor.close()
             cnx.close()
-            print('MySQL connection is closed\n')
+            print('MySQL connection is closed')
 
 
 # get MySQL information from 'MySQL_info.txt'
@@ -356,10 +356,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-# Manual
-# version : 2021-06-29
-# 1. Run 'get_past_data'. It will automatically download the file from
-#    (https://www.worldbank.org/en/research/commodity-markets)
-# 2. Formatted csv file, 'monthly_commodity.csv' will be saved in the directory

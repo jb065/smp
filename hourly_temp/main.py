@@ -84,7 +84,7 @@ def get_past_data(end_date):
             df_temp = pd.DataFrame.from_dict(json_response['response']['body']['items']['item'])
             df_temp = df_temp[['tm', 'ta']]
             df_temp.columns = 'ctime', city_name
-            print(startDt, endDt)
+            print(startDt.date(), endDt.date())
 
             # increment startDt and endDt
             startDt = startDt + relativedelta(months=1)
@@ -430,7 +430,7 @@ def toMySQL():
     engine = create_engine('mysql+mysqldb://{}:{}@{}:{}/{}'.format(id, pw, host_name, port, db_name), echo=False)
     csv_data.to_sql(name='eric_{}'.format(data_name), con=engine, if_exists='replace', index=False, chunksize=10000)
 
-    print('{}.csv is added to MySQL\n'.format(data_name))
+    print('{}.csv is added to MySQL'.format(data_name))
 
     # connect to MySQL
     try:
@@ -458,25 +458,25 @@ def toMySQL():
                        "ADD PRIMARY KEY (`id`);".format(table_name)
         cursor.execute(query_string)
         cnx.commit()
-        print('Data type and features are set\n')
+        print('Data type and features are set')
 
         # set an unique key
         query_string = "ALTER TABLE {} ADD UNIQUE KEY uidx (cdate, ctime, city);".format(table_name)
         cursor.execute(query_string)
         cnx.commit()
-        print('Unique Key(uidx) is set\n')
+        print('Unique Key(uidx) is set')
 
     except mysql.connector.Error as error:
-        print('Failed set datatype and features of MySQL table {}\n'.format(error))
+        print('Failed set datatype and features of MySQL table {}'.format(error))
 
     except:
-        print("Unexpected error:", sys.exc_info(), '\n')
+        print("Unexpected error:", sys.exc_info())
 
     finally:
         if cnx.is_connected():
             cursor.close()
             cnx.close()
-            print('MySQL connection is closed\n')
+            print('MySQL connection is closed')
 
 
 # update MySQL
@@ -538,16 +538,16 @@ def updateMySQL():
                 print("Unexpected error:", sys.exc_info())
 
     except mysql.connector.Error as error:
-        print('Failed to insert into MySQL table. {}\n'.format(error))
+        print('Failed to insert into MySQL table. {}'.format(error))
 
     except:
-        print("Unexpected error:", sys.exc_info(), '\n')
+        print("Unexpected error:", sys.exc_info())
 
     finally:
         if cnx.is_connected():
             cursor.close()
             cnx.close()
-            print('MySQL connection is closed\n')
+            print('MySQL connection is closed')
 
 
 # delete rows in MySQL
@@ -582,13 +582,13 @@ def deleteMySQL():
             print(error)
 
     except:
-        print("Unexpected error:", sys.exc_info(), '\n')
+        print("Unexpected error:", sys.exc_info())
 
     finally:
         if cnx.is_connected():
             cursor.close()
             cnx.close()
-            print('MySQL connection is closed\n')
+            print('MySQL connection is closed')
 
 
 # get MySQL information from 'MySQL_info.txt'
@@ -607,24 +607,16 @@ def getMySQLInfo():
 # main function
 def main():
     # Organize past data
-    # get_past_data('20210629')
+    # get_past_data('20210630')
     # fix_sejong()
     # fix_time()
     # merge()
 
     # MySQL
-    # toMySQL()
+    toMySQL()
     # updateMySQL()
     # deleteMySQL()
 
 
 if __name__ == '__main__':
     main()
-
-
-# Manual
-# version : 2021-06-29
-# 1. Run 'get_past_data('20210630'). It will download hourly_temp data for each city via API
-# 2. Run 'fix_sejong()' because sejong does not contain data before 2019-05-31 11:00
-# 3. Run 'fix_time()' that deletes duplicates and add omitted time values
-# 4. Run 'merge()' to merge all the dataframes of cities into one csv file

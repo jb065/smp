@@ -168,7 +168,7 @@ def toMySQL():
     engine = create_engine('mysql+mysqldb://{}:{}@{}:{}/{}'.format(id, pw, host_name, port, db_name), echo=False)
     csv_data.to_sql(name='eric_{}'.format(data_name), con=engine, if_exists='replace', index=False, chunksize=10000)
 
-    print('{}.csv is added to MySQL\n'.format(data_name))
+    print('{}.csv is added to MySQL'.format(data_name))
 
     # connect to MySQL
     try:
@@ -194,25 +194,25 @@ def toMySQL():
                        "ADD PRIMARY KEY (`id`);".format(table_name)
         cursor.execute(query_string)
         cnx.commit()
-        print('Data type and features are set\n')
+        print('Data type and features are set')
 
         # set an unique key
         query_string = "ALTER TABLE {} ADD UNIQUE KEY uidx (cdate);".format(table_name)
         cursor.execute(query_string)
         cnx.commit()
-        print('Unique Key(uidx) is set\n')
+        print('Unique Key(uidx) is set')
 
     except mysql.connector.Error as error:
-        print('Failed set datatype and features of MySQL table {}\n'.format(error))
+        print('Failed set datatype and features of MySQL table {}'.format(error))
 
     except:
-        print("Unexpected error:", sys.exc_info(), '\n')
+        print("Unexpected error:", sys.exc_info())
 
     finally:
         if cnx.is_connected():
             cursor.close()
             cnx.close()
-            print('MySQL connection is closed\n')
+            print('MySQL connection is closed')
 
 
 # update to MySQL
@@ -244,7 +244,7 @@ def updateMySQL():
         # get new data
         cursor = cnx.cursor()
         new_data = update()
-        print('new_data :', new_data, '\n')
+        print('new_data :', new_data)
 
         # insert the new data to the table
         query_string = 'INSERT INTO {} (cdate, land_wa, jeju_wa) VALUES (%s, %s, %s) ' \
@@ -340,21 +340,9 @@ def main():
 
     # MySQL
     # toMySQL()
-    # updateMySQL()
+    updateMySQL()
     # deleteMySQL()
-
-    print(update())
 
 
 if __name__ == '__main__':
     main()
-
-
-# Manual
-# version : 2021-06-29
-# 1. Download csv files of land and jeju smp weighted average from the link
-#    (http://epsis.kpx.or.kr/epsisnew/selectEkmaSmpShdGrid.do?menuId=050202)
-# 2. Save each of them as 'daily_land_smp_weighted_average.csv' and 'daily_jeju_smp_weighted_average.csv'
-# 3. Run 'format_csv' on both files
-# 4. Run 'merge_csv' to create a csv file that has the data of both land and jeju
-# 5. Three functions can be run all at once

@@ -99,7 +99,7 @@ def get_template(target_date):
     df = pd.DataFrame(columns=['cdate', 'ctime', 'land_smp', 'jeju_smp'])
     ctime_column = []
     for i in range(0, 24):
-        ctime_column.append(datetime.time((i + 1) % 24, 0, 0))
+        ctime_column.append(datetime.time(i % 24, 0, 0))
 
     df['cdate'] = [target_date] * 24
     df['ctime'] = ctime_column
@@ -178,7 +178,7 @@ def update():
     # cdate, ctime column 설정
     ctime_column = []
     for j in range(0, 24):
-        ctime_column.append(datetime.time(hour=(j + 1) % 24, minute=0, second=0))
+        ctime_column.append(datetime.time(hour=j % 24, minute=0, second=0))
     df_update.loc[:, 'ctime'] = ctime_column
     df_update.loc[:, 'cdate'] = datetime.datetime.strptime(tree.find('.//tradeDay').text, '%Y%m%d').date()
 
@@ -206,7 +206,7 @@ def toMySQL():
     engine = create_engine('mysql+mysqldb://{}:{}@{}:{}/{}'.format(id, pw, host_name, port, db_name), echo=False)
     csv_data.to_sql(name='eric_{}'.format(data_name), con=engine, if_exists='replace', index=False, chunksize=10000)
 
-    print('{}.csv is added to MySQL\n'.format(data_name))
+    print('{}.csv is added to MySQL'.format(data_name))
 
     # connect to MySQL
     try:
@@ -233,25 +233,25 @@ def toMySQL():
                        "ADD PRIMARY KEY (`id`); ;".format(table_name)
         cursor.execute(query_string)
         cnx.commit()
-        print('Data type and features are set\n')
+        print('Data type and features are set')
 
         # set an unique key
         query_string = "ALTER TABLE {} ADD UNIQUE KEY uidx (cdate, ctime);".format(table_name)
         cursor.execute(query_string)
         cnx.commit()
-        print('Unique Key(uidx) is set\n')
+        print('Unique Key(uidx) is set')
 
     except mysql.connector.Error as error:
-        print('Failed set datatype and features of MySQL table {}\n'.format(error))
+        print('Failed set datatype and features of MySQL table {}'.format(error))
 
     except:
-        print("Unexpected error:", sys.exc_info(), '\n')
+        print("Unexpected error:", sys.exc_info())
 
     finally:
         if cnx.is_connected():
             cursor.close()
             cnx.close()
-            print('MySQL connection is closed\n')
+            print('MySQL connection is closed')
 
 
 # update MySQL
@@ -308,22 +308,22 @@ def updateMySQL():
                     print('Unexpected row count.', row_data)
 
             except mysql.connector.Error as error:
-                print('Failed to insert into MySQL table. {}\n'.format(error))
+                print('Failed to insert into MySQL table. {}'.format(error))
 
             except:
-                print("Unexpected error:", sys.exc_info(), '\n')
+                print("Unexpected error:", sys.exc_info())
 
     except mysql.connector.Error as error:
-        print('Failed to insert into MySQL table. {}\n'.format(error))
+        print('Failed to insert into MySQL table. {}'.format(error))
 
     except:
-        print("Unexpected error:", sys.exc_info(), '\n')
+        print("Unexpected error:", sys.exc_info())
 
     finally:
         if cnx.is_connected():
             cursor.close()
             cnx.close()
-            print('MySQL connection is closed\n')
+            print('MySQL connection is closed')
 
 
 # delete rows in MySQL
@@ -358,13 +358,13 @@ def deleteMySQL():
             print(error)
 
     except:
-        print("Unexpected error:", sys.exc_info(), '\n')
+        print("Unexpected error:", sys.exc_info())
 
     finally:
         if cnx.is_connected():
             cursor.close()
             cnx.close()
-            print('MySQL connection is closed\n')
+            print('MySQL connection is closed')
 
 
 # get MySQL information from 'MySQL_info.txt'
@@ -395,13 +395,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-# Manual
-# version : 2021-06-29
-# 1. Download csv files of land and jeju smp weighted average from the link
-#    (http://epsis.kpx.or.kr/epsisnew/selectEkmaSmpShdGrid.do?menuId=050202)
-# 2. Save each of them as 'hourly_land_smp.csv' and 'hourly_jeju_smp.csv'
-# 3. Run 'format_csv' on both files
-# 4. Run 'merge_csv' to create a csv file that has the data of both land and jeju
-# 5. Three functions can be run all at once
