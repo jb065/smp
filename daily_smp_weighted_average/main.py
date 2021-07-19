@@ -95,70 +95,58 @@ def merge_csv(csv_land, csv_jeju, csv_merged):
 # 새로운 데이터 수집 후 list 형식으로 return
 def update():
     # print current status
-    print('')
+    print('Getting new data for daily_smp_weighted_average')
+
     # 크롬 창 뜨지 않게 설정 추가
     chrome_options = Options()
     chrome_options.add_argument("--headless")
 
-    # url 에 들어가서 html 을 BeautifulSoup 으로 파싱
+    # chrome driver 을 통한 크롤링
     driver = webdriver.Chrome(r'C:/Users/boojw/Downloads/chromedriver_win32/chromedriver.exe', options=chrome_options)
-    url = 'http://epsis.kpx.or.kr/epsisnew/selectEkmaSmpShdGrid.do?menuId=050202'
+    
+    # 육지 가중평균값 조회
+    url = 'https://www.kpx.or.kr/www/contents.do?key=225'
     driver.get(url)
 
-    # 육지 smp 가 조회될 때 까지 최대 3초 대기
-    # CSS_SELECTOR 중에 해당값이 있을 때 까지 최대 10초 대기
-    try:
-        element_present = EC.presence_of_element_located((By.CSS_SELECTOR, '#rMateH5__Content404 > span:nth-child(55)'))
-        WebDriverWait(driver, 10).until(element_present)
-
-    except TimeoutException:
-        print('Land : Loading took too much time. Returning empty data.')
-        driver.quit()
-        return [datetime.datetime.now(pytz.timezone('Asia/Seoul')).date() - relativedelta(days=1), None, None]
-
-    soup = BeautifulSoup(driver.page_source, 'html.parser')
+    # 새로운 데이터의 날짜 확인
+    land_cdate = driver.find_element_by_xpath("//*[@id=\"day_0\"]").text[:5]
+    land_cdate = datetime.datetime.strptime(land_cdate, '%m.%d').date()
+    today_date = datetime.datetime.now(pytz.timezone('Asia/Seoul')).date()
 
     # 새로운 날짜의 데이터를 저장할 리스트 [cdate, land_wa, jeju_wa]
-    new_data = []
-    # list of weighted average values [land_wa, jeju_wa] -> will be used when converting the values to float type
-    value_list = []
+    new_data = [today_date]
 
-    # 'date' 값 추가
-    target = soup.select_one('#grid1 > div > div > div.rMateH5__DataGridBaseContentHolder > span:nth-child(8)')
-    new_data.append(datetime.datetime.strptime(target.text, '%Y/%m/%d').date())
+    # 수집하려는 데이터가 오늘 데이터가 맞으면, 데이터 정상 수집
+    if land_cdate.month == today_date.month and land_cdate.day == today_date.day:
+        land_wa = driver.find_element_by_css_selector('#smpLandDateSearchForm > fieldset > div.board_list_03 > table > tbody > tr:nth-child(27) > td:nth-child(8)').text
+        new_data.append(float(land_wa))
 
-    # 육지 가중평균값 추가
-    target = soup.select_one('#rMateH5__Content404 > span:nth-child(55)')
-    value_list.append(target.text)
+    # 수집하려는 데이터가 오늘 데이터가 아니면, None 값 부여
+    else:
+        land_wa = None
+        new_data.append(land_wa)
 
-    # 제주 smp 조회
-    driver.find_element_by_css_selector('#selKind2').click()
-    driver.find_element_by_css_selector(
-        '#pageGrid > div > div.opBox > div > span.btnArea > button:nth-child(1)').click()
+    # 제주 가중평균값 조회
+    url = 'https://www.kpx.or.kr/www/contents.do?key=226'
+    driver.get(url)
 
-    # 제주 smp 가 조회될 때 까지 최대 10초 대기
-    try:
-        element_present = EC.presence_of_element_located(
-            (By.CSS_SELECTOR, '#rMateH5__Content1208 > span:nth-child(55)'))
-        WebDriverWait(driver, 10).until(element_present)
+    # 새로운 데이터의 날짜 확인
+    jeju_cdate = driver.find_element_by_xpath("//*[@id=\"dayJeju_0\"]").text[:5]
+    jeju_cdate = datetime.datetime.strptime(jeju_cdate, '%m.%d').date()
 
-    except TimeoutException:
-        print('Jeju : Loading took too much time. Returning empty data')
-        driver.quit()
-        return new_data + [float(i) for i in value_list] + [None]
+    # 수집하려는 데이터가 오늘 데이터가 맞으면, 데이터 정상 수집
+    if jeju_cdate.month == today_date.month and jeju_cdate.day == today_date.day:
+        jeju_wa = driver.find_element_by_css_selector('#smpJejuDateSearchForm > fieldset > div.board_list_03 > table > tbody > tr:nth-child(27) > td:nth-child(8)').text
+        new_data.append(float(jeju_wa))
 
-    # 제주 가중평균값 추가
-    soup = BeautifulSoup(driver.page_source, 'html.parser')
-    target = soup.select_one('#rMateH5__Content1208 > span:nth-child(55)')
-    value_list.append(target.text)
+    # 수집하려는 데이터가 오늘 데이터가 아니면, None 값 부여
+    else:
+        jeju_wa = None
+        new_data.append(jeju_wa)
 
     # 크롬 드라이버 종료
     driver.close()
 
-    # convert weighted average values to float and add them to new_data list
-    new_data = new_data + [float(i) for i in value_list]
-
-    # 수집된 새로운 데이터 return 하기
     return new_data
 
 
@@ -354,6 +342,8 @@ def main():
     # toMySQL()
     # updateMySQL()
     # deleteMySQL()
+
+    print(update())
 
 
 if __name__ == '__main__':
