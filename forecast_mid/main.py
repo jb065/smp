@@ -158,24 +158,23 @@ def toMySQL():
     data_name = 'forecast_mid'
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
-        ip_address = text_file.readline().strip()
+        host_name = text_file.readline().strip()
+        port = text_file.readline().strip()
+        db_name = text_file.readline().strip()
         id = text_file.readline().strip()
         pw = text_file.readline().strip()
 
     csv_data = pd.read_csv('{}.csv'.format(data_name))
-    engine = create_engine('mysql+mysqldb://{}:{}@{}:3306/SMP'.format(id, pw, ip_address), echo=False)
+    engine = create_engine('mysql+mysqldb://{}:{}@{}:{}/SMP'.format(id, pw, host_name, port), echo=False)
     csv_data.to_sql(name='eric_{}'.format(data_name), con=engine, if_exists='replace', index=False, chunksize=10000)
     print('{}.csv is added to MySQL\n'.format(data_name))
 
     # connect to MySQL
     table_name = 'SMP.eric_{}'.format(data_name)
-    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
-        ip_address = text_file.readline().strip()
-        id = text_file.readline().strip()
-        pw = text_file.readline().strip()
+
 
     try:
-        cnx = mysql.connector.connect(user=id, password=pw, host=ip_address, database='SMP')
+        cnx = mysql.connector.connect(user=id, password=pw, host=host_name, database=db_name)
     except mysql.connector.Error as error:
         if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
             print("Something is wrong with your user name or password")
@@ -229,13 +228,15 @@ def updateMySQL():
     print('Updating {}'.format(table_name))
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
-        ip_address = text_file.readline().strip()
+        host_name = text_file.readline().strip()
+        port = text_file.readline().strip()
+        db_name = text_file.readline().strip()
         id = text_file.readline().strip()
         pw = text_file.readline().strip()
 
     # connect to MySQL
     try:
-        cnx = mysql.connector.connect(user=id, password=pw, host=ip_address, database='SMP')
+        cnx = mysql.connector.connect(user=id, password=pw, host=host_name, database=db_name)
     except mysql.connector.Error as error:
         if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
             print("Something is wrong with your user name or password")
@@ -298,13 +299,15 @@ def deleteMySQL():
     print('Deleting data in {}'.format(table_name))
 
     with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
-        ip_address = text_file.readline().strip()
+        host_name = text_file.readline().strip()
+        port = text_file.readline().strip()
+        db_name = text_file.readline().strip()
         id = text_file.readline().strip()
         pw = text_file.readline().strip()
 
     # connect to MySQL
     try:
-        cnx = mysql.connector.connect(user=id, password=pw, host=ip_address, database='SMP')
+        cnx = mysql.connector.connect(user=id, password=pw, host=host_name, database=db_name)
 
         # delete the target
         cursor = cnx.cursor()

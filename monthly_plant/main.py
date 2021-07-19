@@ -103,27 +103,25 @@ def update():
 # csv file to MySQL
 def toMySQL():
     data_name = 'monthly_plant'
+    table_name = 'SMP.eric_{}'.format(data_name)
 
-    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
-        ip_address = text_file.readline().strip()
-        id = text_file.readline().strip()
-        pw = text_file.readline().strip()
+    # get MySQL connection information by calling getMySQLInfo() function
+    MySQL_info = getMySQLInfo()
+    host_name = MySQL_info['host_name']
+    port = MySQL_info['port']
+    db_name = MySQL_info['db_name']
+    id = MySQL_info['id']
+    pw = MySQL_info['pw']
 
     csv_data = pd.read_csv('{}.csv'.format(data_name))
-    engine = create_engine('mysql+mysqldb://{}:{}@{}:3306/SMP'.format(id, pw, ip_address), echo=False)
+    engine = create_engine('mysql+mysqldb://{}:{}@{}:{}/{}'.format(id, pw, host_name, port, db_name), echo=False)
     csv_data.to_sql(name='eric_{}'.format(data_name), con=engine, if_exists='replace', index=False, chunksize=10000)
 
     print('{}.csv is added to MySQL\n'.format(data_name))
 
     # connect to MySQL
-    table_name = 'SMP.eric_{}'.format(data_name)
-    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
-        ip_address = text_file.readline().strip()
-        id = text_file.readline().strip()
-        pw = text_file.readline().strip()
-
     try:
-        cnx = mysql.connector.connect(user=id, password=pw, host=ip_address, database='SMP')
+        cnx = mysql.connector.connect(user=id, password=pw, host=host_name, database=db_name)
     except mysql.connector.Error as error:
         if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
             print("Something is wrong with your user name or password")
@@ -176,14 +174,17 @@ def updateMySQL():
     table_name = 'SMP.eric_monthly_plant'
     print('Updating {}'.format(table_name))
 
-    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
-        ip_address = text_file.readline().strip()
-        id = text_file.readline().strip()
-        pw = text_file.readline().strip()
+    # get MySQL connection information by calling getMySQLInfo() function
+    MySQL_info = getMySQLInfo()
+    host_name = MySQL_info['host_name']
+    port = MySQL_info['port']
+    db_name = MySQL_info['db_name']
+    id = MySQL_info['id']
+    pw = MySQL_info['pw']
 
     # connect to MySQL
     try:
-        cnx = mysql.connector.connect(user=id, password=pw, host=ip_address, database='SMP')
+        cnx = mysql.connector.connect(user=id, password=pw, host=host_name, database=db_name)
     except mysql.connector.Error as error:
         if error.errno == errorcode.ER_ACCESS_DENIED_ERROR:
             print("Something is wrong with your user name or password")
@@ -242,14 +243,17 @@ def deleteMySQL():
     table_name = 'SMP.eric_monthly_plant'
     print('Deleting data in {}'.format(table_name))
 
-    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
-        ip_address = text_file.readline().strip()
-        id = text_file.readline().strip()
-        pw = text_file.readline().strip()
+    # get MySQL connection information by calling getMySQLInfo() function
+    MySQL_info = getMySQLInfo()
+    host_name = MySQL_info['host_name']
+    port = MySQL_info['port']
+    db_name = MySQL_info['db_name']
+    id = MySQL_info['id']
+    pw = MySQL_info['pw']
 
     # connect to MySQL
     try:
-        cnx = mysql.connector.connect(user=id, password=pw, host=ip_address, database='SMP')
+        cnx = mysql.connector.connect(user=id, password=pw, host=host_name, database=db_name)
 
         # delete the target
         cursor = cnx.cursor()
@@ -273,6 +277,19 @@ def deleteMySQL():
             cursor.close()
             cnx.close()
             print('MySQL connection is closed\n')
+
+
+# get MySQL information from 'MySQL_info.txt'
+def getMySQLInfo():
+    with open(r'C:\Users\boojw\OneDrive\Desktop\MySQL_info.txt', 'r') as text_file:
+        host_name = text_file.readline().strip()
+        port = text_file.readline().strip()
+        db_name = text_file.readline().strip()
+        id = text_file.readline().strip()
+        pw = text_file.readline().strip()
+
+    MySQL_info = {'host_name': host_name, 'port': port, 'db_name': db_name, 'id': id, 'pw': pw}
+    return MySQL_info
 
 
 # main function
